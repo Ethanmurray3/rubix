@@ -138,6 +138,40 @@ pub const Cube = struct {
         self.bits = new;
     }
 
+    pub fn turnR(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .br, getChunk(old, .ur));
+        new = setChunk(new, .dr, getChunk(old, .br));
+        new = setChunk(new, .fr, getChunk(old, .dr));
+        new = setChunk(new, .ur, getChunk(old, .fr));
+
+        new = setChunk(new, .urb, twistCornerChunk(getChunk(old, .ufr), 1));
+        new = setChunk(new, .drb, twistCornerChunk(getChunk(old, .urb), 2));
+        new = setChunk(new, .dfr, twistCornerChunk(getChunk(old, .drb), 1));
+        new = setChunk(new, .ufr, twistCornerChunk(getChunk(old, .dfr), 2));
+
+        self.bits = new;
+    }
+
+    pub fn turnRPrime(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .fr, getChunk(old, .ur));
+        new = setChunk(new, .dr, getChunk(old, .fr));
+        new = setChunk(new, .br, getChunk(old, .dr));
+        new = setChunk(new, .ur, getChunk(old, .br));
+
+        new = setChunk(new, .dfr, twistCornerChunk(getChunk(old, .ufr), 1));
+        new = setChunk(new, .drb, twistCornerChunk(getChunk(old, .dfr), 2));
+        new = setChunk(new, .urb, twistCornerChunk(getChunk(old, .drb), 1));
+        new = setChunk(new, .ufr, twistCornerChunk(getChunk(old, .urb), 2));
+
+        self.bits = new;
+    }
+
     pub fn facelet(self: Cube, face: Face, index: usize) Color {
         std.debug.assert(index < 9);
 
@@ -235,6 +269,11 @@ fn makeCornerChunk(piece: Corner, orientation: u2) u5 {
 
 fn makeEdgeChunk(piece: Edge, orientation: u1) u5 {
     return @as(u5, @intFromEnum(piece)) | (@as(u5, orientation) << 4);
+}
+
+fn twistCornerChunk(chunk: u5, amount: u2) u5 {
+    const orientation = @as(u3, cornerOrientation(chunk)) + @as(u3, amount);
+    return makeCornerChunk(cornerFromChunk(chunk), @intCast(orientation % 3));
 }
 
 fn cornerFromChunk(chunk: u5) Corner {

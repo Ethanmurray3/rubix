@@ -63,6 +63,8 @@ Use standard cube notation.
 
 - `U` is clockwise when looking directly at the Up face.
 - `U'` is counterclockwise when looking directly at the Up face.
+- `R` is clockwise when looking directly at the Right face.
+- `R'` is counterclockwise when looking directly at the Right face.
 - The same viewing rule applies to other faces; for example, `D` is clockwise when looking directly at the Down face.
 
 When documenting moves, prefer cubie movement notation:
@@ -97,6 +99,15 @@ new = old
 ```
 
 Then read from `old`, write to `new`, and assign `self.bits = new`.
+
+For `U` and `U'`, move whole 5-bit chunks without changing orientation.
+
+For `R` and `R'`, move whole edge chunks without flipping edges. Corner chunks must be moved with orientation changes that match `Cube.facelet(...)`:
+
+```text
+R:  UFR -> URB (+1), URB -> DRB (+2), DRB -> DFR (+1), DFR -> UFR (+2)
+R': UFR -> DFR (+1), DFR -> DRB (+2), DRB -> URB (+1), URB -> UFR (+2)
+```
 
 ## Future Ideas
 
