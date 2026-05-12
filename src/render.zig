@@ -3,6 +3,7 @@ const cube_mod = @import("cube.zig");
 
 const Color = cube_mod.Color;
 const Cube = cube_mod.Cube;
+const Face = cube_mod.Face;
 
 fn colorChar(color: Color) u8 {
     return switch (color) {
@@ -26,14 +27,14 @@ fn colorAnsi(color: Color) []const u8 {
     };
 }
 
-pub fn printBlankRow() void {
+fn printBlankRow() void {
     std.debug.print("      ", .{});
 }
 
-pub fn printFaceRow(face: [9]Color, row: usize) void {
+fn printFaceRow(cube: Cube, face: Face, row: usize) void {
     const index = 3 * row;
     for (0..3) |col| {
-        const color = face[index + col];
+        const color = cube.facelet(face, index + col);
         std.debug.print("{s}{c}\x1b[0m ", .{
             colorAnsi(color),
             colorChar(color),
@@ -41,72 +42,25 @@ pub fn printFaceRow(face: [9]Color, row: usize) void {
     }
 }
 
-pub fn printFace(face: [9]Color) void {
-    for (0..3) |row| {
-        for (0..3) |col| {
-            const index = row * 3 + col;
-            const color = face[index];
-
-            std.debug.print("{s}{c}\x1b[0m ", .{
-                colorAnsi(color),
-                colorChar(color),
-            });
-        }
-        std.debug.print("\n", .{});
-    }
-}
-
-pub fn printCubeSplit(cube: Cube) void {
-    std.debug.print("Up:\n", .{});
-    printFace(cube.stickers[0]);
-
-    std.debug.print("\nDown:\n", .{});
-    printFace(cube.stickers[1]);
-
-    std.debug.print("\nFront:\n", .{});
-    printFace(cube.stickers[2]);
-
-    std.debug.print("\nBack:\n", .{});
-    printFace(cube.stickers[3]);
-
-    std.debug.print("\nLeft:\n", .{});
-    printFace(cube.stickers[4]);
-
-    std.debug.print("\nRight:\n", .{});
-    printFace(cube.stickers[5]);
-}
-
-pub fn printCubeCompact(cube: Cube) void {
-    std.debug.print("{any}\n", .{cube.stickers});
+pub fn printCube(cube: Cube) void {
+    //print top of cube
     for (0..3) |row| {
         printBlankRow();
-        printFaceRow(cube.stickers[0], row);
+        printFaceRow(cube, .up, row);
         std.debug.print("\n", .{});
     }
-
+    //print all for sides of cube
     for (0..3) |row| {
-        printFaceRow(cube.stickers[4], row); // Left
-        printFaceRow(cube.stickers[2], row); // Front
-        printFaceRow(cube.stickers[5], row); // Right
-        printFaceRow(cube.stickers[3], row); // Back
+        printFaceRow(cube, .left, row);
+        printFaceRow(cube, .front, row);
+        printFaceRow(cube, .right, row);
+        printFaceRow(cube, .back, row);
         std.debug.print("\n", .{});
     }
-
+    //print bottom of cube
     for (0..3) |row| {
         printBlankRow();
-        printFaceRow(cube.stickers[1], row);
+        printFaceRow(cube, .down, row);
         std.debug.print("\n", .{});
     }
-    // print like this
-    //     W W W
-    //     W W W
-    //     W W W
-    //
-    // O O O G G G R R R B B B
-    // O O O G G G R R R B B B
-    // O O O G G G R R R B B B
-    //
-    //     Y Y Y
-    //     Y Y Y
-    //     Y Y Y
 }
