@@ -104,6 +104,10 @@ pub const Cube = struct {
         return .{ .bits = bits };
     }
 
+    pub fn isSolved(self: Cube) bool {
+        return self.bits == Cube.solved().bits;
+    }
+
     pub fn turnU(self: *Cube) void {
         const old = self.bits;
         var new = old;
@@ -138,6 +142,40 @@ pub const Cube = struct {
         self.bits = new;
     }
 
+    pub fn turnD(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .dr, getChunk(old, .df));
+        new = setChunk(new, .db, getChunk(old, .dr));
+        new = setChunk(new, .dl, getChunk(old, .db));
+        new = setChunk(new, .df, getChunk(old, .dl));
+
+        new = setChunk(new, .drb, getChunk(old, .dfr));
+        new = setChunk(new, .dbl, getChunk(old, .drb));
+        new = setChunk(new, .dlf, getChunk(old, .dbl));
+        new = setChunk(new, .dfr, getChunk(old, .dlf));
+
+        self.bits = new;
+    }
+
+    pub fn turnDPrime(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .dl, getChunk(old, .df));
+        new = setChunk(new, .db, getChunk(old, .dl));
+        new = setChunk(new, .dr, getChunk(old, .db));
+        new = setChunk(new, .df, getChunk(old, .dr));
+
+        new = setChunk(new, .dlf, getChunk(old, .dfr));
+        new = setChunk(new, .dbl, getChunk(old, .dlf));
+        new = setChunk(new, .drb, getChunk(old, .dbl));
+        new = setChunk(new, .dfr, getChunk(old, .drb));
+
+        self.bits = new;
+    }
+
     pub fn turnR(self: *Cube) void {
         const old = self.bits;
         var new = old;
@@ -168,6 +206,108 @@ pub const Cube = struct {
         new = setChunk(new, .drb, twistCornerChunk(getChunk(old, .dfr), 2));
         new = setChunk(new, .urb, twistCornerChunk(getChunk(old, .drb), 1));
         new = setChunk(new, .ufr, twistCornerChunk(getChunk(old, .urb), 2));
+
+        self.bits = new;
+    }
+
+    pub fn turnL(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .fl, getChunk(old, .ul));
+        new = setChunk(new, .dl, getChunk(old, .fl));
+        new = setChunk(new, .bl, getChunk(old, .dl));
+        new = setChunk(new, .ul, getChunk(old, .bl));
+
+        new = setChunk(new, .dlf, twistCornerChunk(getChunk(old, .ulf), 2));
+        new = setChunk(new, .dbl, twistCornerChunk(getChunk(old, .dlf), 1));
+        new = setChunk(new, .ubl, twistCornerChunk(getChunk(old, .dbl), 2));
+        new = setChunk(new, .ulf, twistCornerChunk(getChunk(old, .ubl), 1));
+
+        self.bits = new;
+    }
+
+    pub fn turnLPrime(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .bl, getChunk(old, .ul));
+        new = setChunk(new, .dl, getChunk(old, .bl));
+        new = setChunk(new, .fl, getChunk(old, .dl));
+        new = setChunk(new, .ul, getChunk(old, .fl));
+
+        new = setChunk(new, .ubl, twistCornerChunk(getChunk(old, .ulf), 2));
+        new = setChunk(new, .dbl, twistCornerChunk(getChunk(old, .ubl), 1));
+        new = setChunk(new, .dlf, twistCornerChunk(getChunk(old, .dbl), 2));
+        new = setChunk(new, .ulf, twistCornerChunk(getChunk(old, .dlf), 1));
+
+        self.bits = new;
+    }
+
+    pub fn turnF(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .fr, flipEdgeChunk(getChunk(old, .uf)));
+        new = setChunk(new, .df, flipEdgeChunk(getChunk(old, .fr)));
+        new = setChunk(new, .fl, flipEdgeChunk(getChunk(old, .df)));
+        new = setChunk(new, .uf, flipEdgeChunk(getChunk(old, .fl)));
+
+        new = setChunk(new, .dfr, twistCornerChunk(getChunk(old, .ufr), 2));
+        new = setChunk(new, .dlf, twistCornerChunk(getChunk(old, .dfr), 1));
+        new = setChunk(new, .ulf, twistCornerChunk(getChunk(old, .dlf), 2));
+        new = setChunk(new, .ufr, twistCornerChunk(getChunk(old, .ulf), 1));
+
+        self.bits = new;
+    }
+
+    pub fn turnFPrime(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .fl, flipEdgeChunk(getChunk(old, .uf)));
+        new = setChunk(new, .df, flipEdgeChunk(getChunk(old, .fl)));
+        new = setChunk(new, .fr, flipEdgeChunk(getChunk(old, .df)));
+        new = setChunk(new, .uf, flipEdgeChunk(getChunk(old, .fr)));
+
+        new = setChunk(new, .ulf, twistCornerChunk(getChunk(old, .ufr), 2));
+        new = setChunk(new, .dlf, twistCornerChunk(getChunk(old, .ulf), 1));
+        new = setChunk(new, .dfr, twistCornerChunk(getChunk(old, .dlf), 2));
+        new = setChunk(new, .ufr, twistCornerChunk(getChunk(old, .dfr), 1));
+
+        self.bits = new;
+    }
+
+    pub fn turnB(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .bl, flipEdgeChunk(getChunk(old, .ub)));
+        new = setChunk(new, .db, flipEdgeChunk(getChunk(old, .bl)));
+        new = setChunk(new, .br, flipEdgeChunk(getChunk(old, .db)));
+        new = setChunk(new, .ub, flipEdgeChunk(getChunk(old, .br)));
+
+        new = setChunk(new, .ubl, twistCornerChunk(getChunk(old, .urb), 1));
+        new = setChunk(new, .dbl, twistCornerChunk(getChunk(old, .ubl), 2));
+        new = setChunk(new, .drb, twistCornerChunk(getChunk(old, .dbl), 1));
+        new = setChunk(new, .urb, twistCornerChunk(getChunk(old, .drb), 2));
+
+        self.bits = new;
+    }
+
+    pub fn turnBPrime(self: *Cube) void {
+        const old = self.bits;
+        var new = old;
+
+        new = setChunk(new, .br, flipEdgeChunk(getChunk(old, .ub)));
+        new = setChunk(new, .db, flipEdgeChunk(getChunk(old, .br)));
+        new = setChunk(new, .bl, flipEdgeChunk(getChunk(old, .db)));
+        new = setChunk(new, .ub, flipEdgeChunk(getChunk(old, .bl)));
+
+        new = setChunk(new, .drb, twistCornerChunk(getChunk(old, .urb), 1));
+        new = setChunk(new, .dbl, twistCornerChunk(getChunk(old, .drb), 2));
+        new = setChunk(new, .ubl, twistCornerChunk(getChunk(old, .dbl), 1));
+        new = setChunk(new, .urb, twistCornerChunk(getChunk(old, .ubl), 2));
 
         self.bits = new;
     }
@@ -274,6 +414,10 @@ fn makeEdgeChunk(piece: Edge, orientation: u1) u5 {
 fn twistCornerChunk(chunk: u5, amount: u2) u5 {
     const orientation = @as(u3, cornerOrientation(chunk)) + @as(u3, amount);
     return makeCornerChunk(cornerFromChunk(chunk), @intCast(orientation % 3));
+}
+
+fn flipEdgeChunk(chunk: u5) u5 {
+    return makeEdgeChunk(edgeFromChunk(chunk), edgeOrientation(chunk) ^ 1);
 }
 
 fn cornerFromChunk(chunk: u5) Corner {
