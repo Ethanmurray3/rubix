@@ -46,6 +46,39 @@ pub const Edge = enum(u4) {
 
 pub const CubeBits = u100;
 
+pub const Move = enum(u5) {
+    U,
+    UPrime,
+    U2,
+    D,
+    DPrime,
+    D2,
+    R,
+    RPrime,
+    R2,
+    L,
+    LPrime,
+    L2,
+    F,
+    FPrime,
+    F2,
+    B,
+    BPrime,
+    B2,
+};
+
+pub const MoveAxis = enum {
+    up_down,
+    right_left,
+    front_back,
+};
+
+pub const scramble_length = 20;
+
+pub const Scramble = struct {
+    moves: [scramble_length]Move,
+};
+
 const chunk_size = 5;
 const chunk_mask: CubeBits = 0b11111;
 
@@ -108,6 +141,68 @@ pub const Cube = struct {
 
     pub fn isSolved(self: Cube) bool {
         return self.bits == solved_bits;
+    }
+
+    pub fn scramble(self: *Cube) Scramble {
+        var seed: u64 = undefined;
+        std.options.debug_io.random(std.mem.asBytes(&seed));
+
+        var prng = std.Random.DefaultPrng.init(seed);
+        return self.scrambleWithRandom(prng.random());
+    }
+
+    pub fn scrambleWithRandom(self: *Cube, random: std.Random) Scramble {
+        var result: Scramble = undefined;
+        var previous: ?Move = null;
+
+        for (&result.moves) |*move| {
+            move.* = randomMove(random, previous);
+            self.applyMove(move.*);
+            previous = move.*;
+        }
+
+        return result;
+    }
+
+    pub fn applyMove(self: *Cube, move: Move) void {
+        switch (move) {
+            .U => self.turnU(),
+            .UPrime => self.turnUPrime(),
+            .U2 => {
+                self.turnU();
+                self.turnU();
+            },
+            .D => self.turnD(),
+            .DPrime => self.turnDPrime(),
+            .D2 => {
+                self.turnD();
+                self.turnD();
+            },
+            .R => self.turnR(),
+            .RPrime => self.turnRPrime(),
+            .R2 => {
+                self.turnR();
+                self.turnR();
+            },
+            .L => self.turnL(),
+            .LPrime => self.turnLPrime(),
+            .L2 => {
+                self.turnL();
+                self.turnL();
+            },
+            .F => self.turnF(),
+            .FPrime => self.turnFPrime(),
+            .F2 => {
+                self.turnF();
+                self.turnF();
+            },
+            .B => self.turnB(),
+            .BPrime => self.turnBPrime(),
+            .B2 => {
+                self.turnB();
+                self.turnB();
+            },
+        }
     }
 
     pub fn turnU(self: *Cube) void {
@@ -403,6 +498,46 @@ fn setChunk(bits: CubeBits, position: Position, chunk: u5) CubeBits {
     const shift: u7 = @as(u7, @intFromEnum(position)) * chunk_size;
     const clear_mask = ~(chunk_mask << shift);
     return (bits & clear_mask) | (@as(CubeBits, chunk) << shift);
+}
+
+pub fn moveAxis(move: Move) MoveAxis {
+    return switch (move) {
+        .U, .UPrime, .U2, .D, .DPrime, .D2 => .up_down,
+        .R, .RPrime, .R2, .L, .LPrime, .L2 => .right_left,
+        .F, .FPrime, .F2, .B, .BPrime, .B2 => .front_back,
+    };
+}
+
+pub fn moveName(move: Move) []const u8 {
+    return switch (move) {
+        .U => "U",
+        .UPrime => "U'",
+        .U2 => "U2",
+        .D => "D",
+        .DPrime => "D'",
+        .D2 => "D2",
+        .R => "R",
+        .RPrime => "R'",
+        .R2 => "R2",
+        .L => "L",
+        .LPrime => "L'",
+        .L2 => "L2",
+        .F => "F",
+        .FPrime => "F'",
+        .F2 => "F2",
+        .B => "B",
+        .BPrime => "B'",
+        .B2 => "B2",
+    };
+}
+
+fn randomMove(random: std.Random, previous: ?Move) Move {
+    while (true) {
+        const move = random.enumValue(Move);
+        if (previous == null or moveAxis(move) != moveAxis(previous.?)) {
+            return move;
+        }
+    }
 }
 
 fn makeCornerChunk(piece: Corner, orientation: u2) u5 {
