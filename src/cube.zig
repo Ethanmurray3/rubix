@@ -143,9 +143,9 @@ pub const Cube = struct {
         return self.bits == solved_bits;
     }
 
-    pub fn scramble(self: *Cube) Scramble {
+    pub fn scramble(self: *Cube, io: std.Io) Scramble {
         var seed: u64 = undefined;
-        std.options.debug_io.random(std.mem.asBytes(&seed));
+        io.random(std.mem.asBytes(&seed));
 
         var prng = std.Random.DefaultPrng.init(seed);
         return self.scrambleWithRandom(prng.random());

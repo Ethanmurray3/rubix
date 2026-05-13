@@ -26,7 +26,7 @@ fn colorAnsi(color: Color) []const u8 {
         .red => "\x1b[91m",
     };
 }
-
+//help function for formatting cube to terminal
 fn printBlankRow() void {
     std.debug.print("      ", .{});
 }
