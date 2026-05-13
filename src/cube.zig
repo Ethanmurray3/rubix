@@ -73,6 +73,8 @@ const Position = enum(u5) {
     dl = 19,
 };
 
+const solved_bits: CubeBits = Cube.solved().bits;
+
 pub const Cube = struct {
     bits: CubeBits,
 
@@ -105,7 +107,7 @@ pub const Cube = struct {
     }
 
     pub fn isSolved(self: Cube) bool {
-        return self.bits == Cube.solved().bits;
+        return self.bits == solved_bits;
     }
 
     pub fn turnU(self: *Cube) void {
@@ -440,7 +442,7 @@ fn cornerColor(position: Position, chunk: u5, face: Face) Color {
     const faces = cornerPositionFaces(position);
     const colors = cornerColors(cornerFromChunk(chunk));
     const position_index = indexOfCornerFace(faces, face);
-    const color_index = (position_index + cornerOrientation(chunk)) % 3;
+    const color_index = (@as(u3, position_index) + @as(u3, cornerOrientation(chunk))) % 3;
     return colors[@intCast(color_index)];
 }
 
