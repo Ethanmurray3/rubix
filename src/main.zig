@@ -6,6 +6,8 @@ const render3d = @import("render3d.zig");
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
 const Move = cube_mod.Move;
+const Axis = render3d.Axis;
+const Orientation = render3d.Orientation;
 
 const CameraOrbit = struct {
     yaw: f32 = -0.75,
@@ -34,15 +36,6 @@ const LastAction = struct {
     highlight_time: f32 = 0,
 };
 
-const Axis = enum {
-    positive_x,
-    negative_x,
-    positive_y,
-    negative_y,
-    positive_z,
-    negative_z,
-};
-
 const ViewControls = struct {
     up: Face,
     down: Face,
@@ -50,6 +43,12 @@ const ViewControls = struct {
     left: Face,
     front: Face,
     back: Face,
+};
+
+const ViewAxes = struct {
+    up: Axis,
+    right: Axis,
+    front: Axis,
 };
 
 const axes = [_]Axis{
@@ -78,11 +77,23 @@ pub fn main(init: std.process.Init) !void {
     rl.setTargetFPS(60);
 
     var orbit: CameraOrbit = .{};
+    var orientation: Orientation = .{};
     var last: LastAction = .{};
 
     while (!rl.windowShouldClose()) {
         updateCameraOrbit(&orbit);
-        const controls = viewControls(orbit.camera());
+        const camera = orbit.camera();
+        const view_axes = cameraViewAxes(camera);
+        var controls = viewControls(view_axes, orientation);
+
+        if (readOrientationInput(&orientation, view_axes)) {
+            controls = viewControls(view_axes, orientation);
+            last = .{
+                .status = "Reoriented",
+                .face = null,
+                .highlight_time = 0,
+            };
+        }
 
         if (readMoveInput(controls)) |move| {
             cube.applyMove(move);
@@ -104,6 +115,7 @@ pub fn main(init: std.process.Init) !void {
 
         if (rl.isKeyPressed(.space)) {
             cube = Cube.solved();
+            orientation = .{};
             last = .{
                 .status = "Solved",
                 .face = null,
@@ -116,7 +128,7 @@ pub fn main(init: std.process.Init) !void {
         }
 
         last.highlight_time = @max(0, last.highlight_time - rl.getFrameTime());
-        draw(cube, orbit.camera(), last, controls);
+        draw(cube, camera, orientation, last, controls);
     }
 }
 
@@ -147,6 +159,44 @@ fn turnKeyPressed(key: rl.KeyboardKey) bool {
     return rl.isKeyPressed(key) or rl.isKeyPressedRepeat(key);
 }
 
+fn readOrientationInput(orientation: *Orientation, view_axes: ViewAxes) bool {
+    if (rl.isKeyPressed(.up)) {
+        orientation.rotateAroundWorldAxis(view_axes.right, false);
+        return true;
+    }
+    if (rl.isKeyPressed(.down)) {
+        orientation.rotateAroundWorldAxis(view_axes.right, true);
+        return true;
+    }
+    if (rl.isKeyPressed(.left)) {
+        orientation.rotateAroundWorldAxis(view_axes.up, false);
+        return true;
+    }
+    if (rl.isKeyPressed(.right)) {
+        orientation.rotateAroundWorldAxis(view_axes.up, true);
+        return true;
+    }
+    if (rl.isKeyPressed(.z)) {
+        orientation.rotateAroundWorldAxis(view_axes.front, false);
+        return true;
+    }
+    if (rl.isKeyPressed(.x)) {
+        orientation.rotateAroundWorldAxis(view_axes.front, true);
+        return true;
+    }
+    if (rl.isKeyPressed(.c)) {
+        orientation.rotateAroundWorldAxis(view_axes.right, true);
+        orientation.rotateAroundWorldAxis(view_axes.right, true);
+        return true;
+    }
+    if (rl.isKeyPressed(.zero)) {
+        orientation.* = .{};
+        return true;
+    }
+
+    return false;
+}
+
 fn shiftDown() bool {
     return rl.isKeyDown(.left_shift) or rl.isKeyDown(.right_shift);
 }
@@ -175,7 +225,7 @@ fn moveForFace(face: Face, prime: bool) Move {
     };
 }
 
-fn viewControls(camera: rl.Camera3D) ViewControls {
+fn cameraViewAxes(camera: rl.Camera3D) ViewAxes {
     const camera_axis = nearestAxis(camera.position);
     const forward = normalize(vec3Scale(camera.position, -1));
     const right = normalize(cross(.{ .x = 0, .y = 1, .z = 0 }, camera.position));
@@ -186,12 +236,20 @@ fn viewControls(camera: rl.Camera3D) ViewControls {
     const up_axis = nearestAxisExcept(up, front_axis, right_axis);
 
     return .{
-        .up = faceForAxis(up_axis),
-        .down = faceForAxis(oppositeAxis(up_axis)),
-        .right = faceForAxis(right_axis),
-        .left = faceForAxis(oppositeAxis(right_axis)),
-        .front = faceForAxis(front_axis),
-        .back = faceForAxis(oppositeAxis(front_axis)),
+        .up = up_axis,
+        .right = right_axis,
+        .front = front_axis,
+    };
+}
+
+fn viewControls(view_axes: ViewAxes, orientation: Orientation) ViewControls {
+    return .{
+        .up = orientation.faceOnWorldAxis(view_axes.up),
+        .down = orientation.faceOnWorldAxis(render3d.oppositeAxis(view_axes.up)),
+        .right = orientation.faceOnWorldAxis(view_axes.right),
+        .left = orientation.faceOnWorldAxis(render3d.oppositeAxis(view_axes.right)),
+        .front = orientation.faceOnWorldAxis(view_axes.front),
+        .back = orientation.faceOnWorldAxis(render3d.oppositeAxis(view_axes.front)),
     };
 }
 
@@ -200,7 +258,7 @@ fn nearestAxis(vector: rl.Vector3) Axis {
     var best = -std.math.inf(f32);
 
     for (axes) |axis| {
-        const score = dot(vector, axisVector(axis));
+        const score = dot(vector, render3d.axisVector(axis));
         if (score > best) {
             best = score;
             result = axis;
@@ -220,7 +278,7 @@ fn nearestAxisExcept(vector: rl.Vector3, first_blocked: Axis, second_blocked: ?A
             if (sameAxisLine(axis, blocked)) continue;
         }
 
-        const score = dot(vector, axisVector(axis));
+        const score = dot(vector, render3d.axisVector(axis));
         if (score > best) {
             best = score;
             result = axis;
@@ -235,39 +293,6 @@ fn sameAxisLine(a: Axis, b: Axis) bool {
         .positive_x, .negative_x => b == .positive_x or b == .negative_x,
         .positive_y, .negative_y => b == .positive_y or b == .negative_y,
         .positive_z, .negative_z => b == .positive_z or b == .negative_z,
-    };
-}
-
-fn oppositeAxis(axis: Axis) Axis {
-    return switch (axis) {
-        .positive_x => .negative_x,
-        .negative_x => .positive_x,
-        .positive_y => .negative_y,
-        .negative_y => .positive_y,
-        .positive_z => .negative_z,
-        .negative_z => .positive_z,
-    };
-}
-
-fn faceForAxis(axis: Axis) Face {
-    return switch (axis) {
-        .positive_x => .right,
-        .negative_x => .left,
-        .positive_y => .up,
-        .negative_y => .down,
-        .positive_z => .front,
-        .negative_z => .back,
-    };
-}
-
-fn axisVector(axis: Axis) rl.Vector3 {
-    return switch (axis) {
-        .positive_x => .{ .x = 1, .y = 0, .z = 0 },
-        .negative_x => .{ .x = -1, .y = 0, .z = 0 },
-        .positive_y => .{ .x = 0, .y = 1, .z = 0 },
-        .negative_y => .{ .x = 0, .y = -1, .z = 0 },
-        .positive_z => .{ .x = 0, .y = 0, .z = 1 },
-        .negative_z => .{ .x = 0, .y = 0, .z = -1 },
     };
 }
 
@@ -335,14 +360,14 @@ fn moveNameZ(move: Move) [:0]const u8 {
     };
 }
 
-fn draw(cube: Cube, camera: rl.Camera3D, last: LastAction, controls: ViewControls) void {
+fn draw(cube: Cube, camera: rl.Camera3D, orientation: Orientation, last: LastAction, controls: ViewControls) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
     rl.clearBackground(rl.Color.init(18, 20, 24, 255));
 
     camera.begin();
-    render3d.drawCube(cube, last.face, highlightAlpha(last.highlight_time));
+    render3d.drawCube(cube, orientation, last.face, highlightAlpha(last.highlight_time));
     rl.drawGrid(10, 1.0);
     camera.end();
 
@@ -370,11 +395,12 @@ fn drawOverlay(status: [:0]const u8, controls: ViewControls) void {
     ) catch unreachable;
 
     const panel_color = rl.Color.init(12, 14, 18, 210);
-    rl.drawRectangle(16, 16, 590, 112, panel_color);
-    rl.drawRectangleLines(16, 16, 590, 112, rl.Color.init(70, 76, 88, 255));
+    rl.drawRectangle(16, 16, 660, 136, panel_color);
+    rl.drawRectangleLines(16, 16, 660, 136, rl.Color.init(70, 76, 88, 255));
     rl.drawText("Rubix", 32, 28, 28, rl.Color.ray_white);
     rl.drawText(controls_text, 32, 68, 16, rl.Color.light_gray);
-    rl.drawText("Tab: scramble    Space: reset    Drag: orbit    Wheel: zoom    Esc: quit", 32, 94, 16, rl.Color.light_gray);
+    rl.drawText("Arrows/Z/X: rotate cube    C: flip    0: reset orientation", 32, 94, 16, rl.Color.light_gray);
+    rl.drawText("Tab: scramble    Space: reset    Drag: orbit    Wheel: zoom    Esc: quit", 32, 120, 16, rl.Color.light_gray);
 
     const status_width = rl.measureText(status, 24);
     const x = rl.getScreenWidth() - status_width - 32;
