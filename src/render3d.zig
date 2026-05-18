@@ -1,4 +1,5 @@
 const rl = @import("raylib");
+const animation = @import("animation.zig");
 const cube_mod = @import("cube.zig");
 
 const Cube = cube_mod.Cube;
@@ -66,47 +67,87 @@ const face_coord: f32 = 1.54;
 const sticker_size: f32 = 0.88;
 const sticker_thickness: f32 = 0.08;
 
-pub fn drawCube(cube: Cube, orientation: Orientation, highlight_face: ?Face, highlight_alpha: u8) void {
+pub fn drawCube(
+    cube: Cube,
+    orientation: Orientation,
+    visual_turn: ?animation.VisualTurn,
+    highlight_face: ?Face,
+    highlight_alpha: u8,
+) void {
     rl.drawCubeV(
         vec3(0, 0, 0),
         vec3(core_size, core_size, core_size),
-        rl.Color.init(24, 27, 31, 255),
+        rl.Color.init(35, 38, 43, 255),
     );
     rl.drawCubeWiresV(
         vec3(0, 0, 0),
         vec3(core_size, core_size, core_size),
-        rl.Color.init(5, 5, 7, 255),
+        rl.Color.init(17, 18, 21, 255),
     );
 
-    drawFace(cube, orientation, .up);
-    drawFace(cube, orientation, .down);
-    drawFace(cube, orientation, .front);
-    drawFace(cube, orientation, .back);
-    drawFace(cube, orientation, .left);
-    drawFace(cube, orientation, .right);
+    drawFace(cube, orientation, visual_turn, .up);
+    drawFace(cube, orientation, visual_turn, .down);
+    drawFace(cube, orientation, visual_turn, .front);
+    drawFace(cube, orientation, visual_turn, .back);
+    drawFace(cube, orientation, visual_turn, .left);
+    drawFace(cube, orientation, visual_turn, .right);
 
     if (highlight_face) |face| {
         if (highlight_alpha > 0) drawHighlight(orientation, face, highlight_alpha);
     }
 }
 
-fn drawFace(cube: Cube, orientation: Orientation, face: Face) void {
+fn drawFace(cube: Cube, orientation: Orientation, visual_turn: ?animation.VisualTurn, face: Face) void {
     for (0..3) |row| {
         for (0..3) |col| {
             const index = row * 3 + col;
             const sticker = stickerTransform(face, row, col);
-            rl.drawCubeV(
-                orientation.transformPosition(sticker.position),
-                orientation.transformSize(sticker.size),
-                rayColor(cube.facelet(face, index)),
-            );
-            rl.drawCubeWiresV(
-                orientation.transformPosition(sticker.position),
-                orientation.transformSize(sticker.size),
-                rl.Color.init(12, 12, 14, 255),
-            );
+            const color = rayColor(cube.facelet(face, index));
+            if (visual_turn) |turn| {
+                if (stickerInMovingLayer(sticker.position, turn.face)) {
+                    drawAnimatedSticker(orientation, sticker, color, turn);
+                    continue;
+                }
+            }
+            drawStaticSticker(orientation, sticker, color);
         }
     }
+}
+
+fn drawStaticSticker(orientation: Orientation, sticker: StickerTransform, color: rl.Color) void {
+    rl.drawCubeV(
+        orientation.transformPosition(sticker.position),
+        orientation.transformSize(sticker.size),
+        color,
+    );
+    rl.drawCubeWiresV(
+        orientation.transformPosition(sticker.position),
+        orientation.transformSize(sticker.size),
+        rl.Color.init(22, 24, 28, 255),
+    );
+}
+
+fn drawAnimatedSticker(
+    orientation: Orientation,
+    sticker: StickerTransform,
+    color: rl.Color,
+    turn: animation.VisualTurn,
+) void {
+    const normal = faceNormal(turn.face);
+
+    rl.gl.rlPushMatrix();
+    defer rl.gl.rlPopMatrix();
+
+    applyOrientation(orientation);
+    rl.gl.rlTranslatef(
+        normal.x * turn.layer_lift,
+        normal.y * turn.layer_lift,
+        normal.z * turn.layer_lift,
+    );
+    rl.gl.rlRotatef(turn.angle_degrees, normal.x, normal.y, normal.z);
+
+    rl.drawCubeV(sticker.position, sticker.size, color);
+    rl.drawCubeWiresV(sticker.position, sticker.size, rl.Color.init(22, 24, 28, 255));
 }
 
 fn drawHighlight(orientation: Orientation, face: Face, alpha: u8) void {
@@ -161,14 +202,51 @@ fn stickerTransform(face: Face, row: usize, col: usize) StickerTransform {
     };
 }
 
+fn stickerInMovingLayer(position: rl.Vector3, face: Face) bool {
+    const threshold: f32 = 0.5;
+    return switch (face) {
+        .up => position.y > threshold,
+        .down => position.y < -threshold,
+        .front => position.z > threshold,
+        .back => position.z < -threshold,
+        .left => position.x < -threshold,
+        .right => position.x > threshold,
+    };
+}
+
+fn faceNormal(face: Face) rl.Vector3 {
+    return switch (face) {
+        .up => vec3(0, 1, 0),
+        .down => vec3(0, -1, 0),
+        .front => vec3(0, 0, 1),
+        .back => vec3(0, 0, -1),
+        .left => vec3(-1, 0, 0),
+        .right => vec3(1, 0, 0),
+    };
+}
+
+fn applyOrientation(orientation: Orientation) void {
+    const x_axis = axisVector(orientation.right);
+    const y_axis = axisVector(orientation.up);
+    const z_axis = axisVector(orientation.front);
+    const matrix = [_]f32{
+        x_axis.x, x_axis.y, x_axis.z, 0,
+        y_axis.x, y_axis.y, y_axis.z, 0,
+        z_axis.x, z_axis.y, z_axis.z, 0,
+        0,        0,        0,        1,
+    };
+
+    rl.gl.rlMultMatrixf(&matrix);
+}
+
 fn rayColor(color: CubeColor) rl.Color {
     return switch (color) {
-        .white => rl.Color.init(245, 245, 238, 255),
-        .yellow => rl.Color.init(252, 211, 43, 255),
-        .green => rl.Color.init(30, 176, 85, 255),
-        .blue => rl.Color.init(38, 96, 202, 255),
-        .orange => rl.Color.init(242, 125, 32, 255),
-        .red => rl.Color.init(218, 45, 50, 255),
+        .white => rl.Color.init(250, 247, 239, 255),
+        .yellow => rl.Color.init(255, 225, 87, 255),
+        .green => rl.Color.init(101, 211, 132, 255),
+        .blue => rl.Color.init(92, 146, 238, 255),
+        .orange => rl.Color.init(255, 164, 93, 255),
+        .red => rl.Color.init(246, 92, 104, 255),
     };
 }
 

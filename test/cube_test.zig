@@ -1,5 +1,7 @@
 const std = @import("std");
-const cube_mod = @import("rubix").cube;
+const rubix = @import("rubix");
+const animation = rubix.animation;
+const cube_mod = rubix.cube;
 const Cube = cube_mod.Cube;
 const Move = cube_mod.Move;
 
@@ -119,4 +121,81 @@ test "scramble returns twenty moves and avoids adjacent axes" {
     for (scramble.moves[1..], 1..) |move, index| {
         try std.testing.expect(cube_mod.moveAxis(move) != cube_mod.moveAxis(scramble.moves[index - 1]));
     }
+}
+
+test "random scramble does not mutate solved cube" {
+    var prng = std.Random.DefaultPrng.init(12345);
+    const random = prng.random();
+
+    const cube = Cube.solved();
+    const scramble = Cube.randomScramble(random);
+
+    try std.testing.expectEqual(@as(usize, cube_mod.scramble_length), scramble.moves.len);
+    try expectSolved(cube);
+
+    for (scramble.moves[1..], 1..) |move, index| {
+        try std.testing.expect(cube_mod.moveAxis(move) != cube_mod.moveAxis(scramble.moves[index - 1]));
+    }
+}
+
+test "scramble with random still mutates cube" {
+    var prng = std.Random.DefaultPrng.init(12345);
+    const random = prng.random();
+
+    var cube = Cube.solved();
+    _ = cube.scrambleWithRandom(random);
+
+    try std.testing.expect(!cube.isSolved());
+}
+
+test "animator preserves move order" {
+    var animator: animation.Animator = .{ .user_turn_duration = 0.1 };
+    var cube = Cube.solved();
+
+    try std.testing.expect(animator.enqueue(.R));
+    try std.testing.expect(animator.enqueue(.U));
+
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.05, &cube));
+    try std.testing.expectEqual(@as(?Move, .R), animator.activeMove());
+    try std.testing.expectEqual(@as(?Move, .R), animator.update(0.05, &cube));
+
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0, &cube));
+    try std.testing.expectEqual(@as(?Move, .U), animator.activeMove());
+    try std.testing.expectEqual(@as(?Move, .U), animator.update(0.1, &cube));
+}
+
+test "animator commits moves only after duration completes" {
+    var animator: animation.Animator = .{ .user_turn_duration = 0.1 };
+    var cube = Cube.solved();
+    const solved_bits = cube.bits;
+
+    try std.testing.expect(animator.enqueue(.R));
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.099, &cube));
+    try std.testing.expectEqual(solved_bits, cube.bits);
+
+    try std.testing.expectEqual(@as(?Move, .R), animator.update(0.001, &cube));
+    try std.testing.expect(cube.bits != solved_bits);
+}
+
+test "active animation reaches final target angle at completion progress" {
+    const visual = animation.visualTurnForProgress(.R, 1.0);
+
+    try std.testing.expectEqual(.right, visual.face);
+    try std.testing.expectApproxEqAbs(@as(f32, -90), visual.angle_degrees, 0.001);
+    try std.testing.expectApproxEqAbs(@as(f32, 0), visual.layer_lift, 0.001);
+}
+
+test "animator clear leaves no active move and no queued moves" {
+    var animator: animation.Animator = .{};
+    var cube = Cube.solved();
+
+    try std.testing.expect(animator.enqueue(.R));
+    try std.testing.expect(animator.enqueue(.U));
+    _ = animator.update(0.01, &cube);
+
+    animator.clear();
+
+    try std.testing.expectEqual(@as(?Move, null), animator.activeMove());
+    try std.testing.expectEqual(@as(usize, 0), animator.queuedCount());
+    try std.testing.expect(animator.isIdle());
 }

@@ -1,8 +1,10 @@
 const std = @import("std");
 const rl = @import("raylib");
+const animation = @import("animation.zig");
 const cube_mod = @import("cube.zig");
 const render3d = @import("render3d.zig");
 
+const Animator = animation.Animator;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
 const Move = cube_mod.Move;
@@ -32,6 +34,7 @@ const CameraOrbit = struct {
 
 const LastAction = struct {
     status: [:0]const u8 = "Solved",
+    scramble: [:0]const u8 = "",
     face: ?Face = null,
     highlight_time: f32 = 0,
 };
@@ -78,9 +81,12 @@ pub fn main(init: std.process.Init) !void {
 
     var orbit: CameraOrbit = .{};
     var orientation: Orientation = .{};
+    var animator: Animator = .{};
     var last: LastAction = .{};
+    var scramble_buffer: [128]u8 = undefined;
 
     while (!rl.windowShouldClose()) {
+        const frame_time = rl.getFrameTime();
         updateCameraOrbit(&orbit);
         const camera = orbit.camera();
         const view_axes = cameraViewAxes(camera);
@@ -90,24 +96,33 @@ pub fn main(init: std.process.Init) !void {
             controls = viewControls(view_axes, orientation);
             last = .{
                 .status = "Reoriented",
+                .scramble = last.scramble,
                 .face = null,
                 .highlight_time = 0,
             };
         }
 
         if (readMoveInput(controls)) |move| {
-            cube.applyMove(move);
-            last = .{
-                .status = moveNameZ(move),
-                .face = moveFace(move),
-                .highlight_time = 0.18,
-            };
+            if (animator.enqueue(move)) {
+                last = .{
+                    .status = moveNameZ(move),
+                    .scramble = "",
+                    .face = cube_mod.moveFace(move),
+                    .highlight_time = 0.18,
+                };
+            }
         }
 
         if (rl.isKeyPressed(.tab)) {
-            _ = cube.scrambleWithRandom(prng.random());
+            cube = Cube.solved();
+            animator.clear();
+            const scramble = Cube.randomScramble(prng.random());
+            animator.enqueueScramble(scramble);
+            const notation = scrambleNotationZ(&scramble_buffer, scramble);
+            rl.setClipboardText(notation);
             last = .{
-                .status = "Scrambled",
+                .status = "Scrambling",
+                .scramble = notation,
                 .face = null,
                 .highlight_time = 0.18,
             };
@@ -116,19 +131,31 @@ pub fn main(init: std.process.Init) !void {
         if (rl.isKeyPressed(.space)) {
             cube = Cube.solved();
             orientation = .{};
+            animator.clear();
             last = .{
                 .status = "Solved",
+                .scramble = "",
                 .face = null,
                 .highlight_time = 0,
             };
         }
 
-        if (cube.isSolved()) {
+        if (animator.update(frame_time, &cube)) |move| {
+            last.status = moveNameZ(move);
+            last.face = cube_mod.moveFace(move);
+            last.highlight_time = 0.18;
+        }
+
+        if (animator.activeMove()) |move| {
+            last.status = moveNameZ(move);
+            last.face = cube_mod.moveFace(move);
+            last.highlight_time = 0.18;
+        } else if (cube.isSolved() and animator.isIdle()) {
             last.status = "Solved";
         }
 
-        last.highlight_time = @max(0, last.highlight_time - rl.getFrameTime());
-        draw(cube, camera, orientation, last, controls);
+        last.highlight_time = @max(0, last.highlight_time - frame_time);
+        draw(cube, camera, orientation, last, controls, animator.visualTurn());
     }
 }
 
@@ -326,17 +353,6 @@ fn dot(a: rl.Vector3, b: rl.Vector3) f32 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-fn moveFace(move: Move) Face {
-    return switch (move) {
-        .U, .UPrime, .U2 => .up,
-        .D, .DPrime, .D2 => .down,
-        .R, .RPrime, .R2 => .right,
-        .L, .LPrime, .L2 => .left,
-        .F, .FPrime, .F2 => .front,
-        .B, .BPrime, .B2 => .back,
-    };
-}
-
 fn moveNameZ(move: Move) [:0]const u8 {
     return switch (move) {
         .U => "U",
@@ -360,18 +376,24 @@ fn moveNameZ(move: Move) [:0]const u8 {
     };
 }
 
-fn draw(cube: Cube, camera: rl.Camera3D, orientation: Orientation, last: LastAction, controls: ViewControls) void {
+fn draw(
+    cube: Cube,
+    camera: rl.Camera3D,
+    orientation: Orientation,
+    last: LastAction,
+    controls: ViewControls,
+    visual_turn: ?animation.VisualTurn,
+) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
-    rl.clearBackground(rl.Color.init(18, 20, 24, 255));
+    rl.clearBackground(rl.Color.init(180, 221, 245, 255));
 
     camera.begin();
-    render3d.drawCube(cube, orientation, last.face, highlightAlpha(last.highlight_time));
-    rl.drawGrid(10, 1.0);
+    render3d.drawCube(cube, orientation, visual_turn, last.face, highlightAlpha(last.highlight_time));
     camera.end();
 
-    drawOverlay(last.status, controls);
+    drawOverlay(last, controls);
 }
 
 fn highlightAlpha(time_left: f32) u8 {
@@ -379,7 +401,7 @@ fn highlightAlpha(time_left: f32) u8 {
     return @intFromFloat(ratio * 90.0);
 }
 
-fn drawOverlay(status: [:0]const u8, controls: ViewControls) void {
+fn drawOverlay(last: LastAction, controls: ViewControls) void {
     var controls_buffer: [160]u8 = undefined;
     const controls_text = std.fmt.bufPrintZ(
         &controls_buffer,
@@ -394,17 +416,24 @@ fn drawOverlay(status: [:0]const u8, controls: ViewControls) void {
         },
     ) catch unreachable;
 
-    const panel_color = rl.Color.init(12, 14, 18, 210);
-    rl.drawRectangle(16, 16, 660, 136, panel_color);
-    rl.drawRectangleLines(16, 16, 660, 136, rl.Color.init(70, 76, 88, 255));
-    rl.drawText("Rubix", 32, 28, 28, rl.Color.ray_white);
-    rl.drawText(controls_text, 32, 68, 16, rl.Color.light_gray);
-    rl.drawText("Arrows/Z/X: rotate cube    C: flip    0: reset orientation", 32, 94, 16, rl.Color.light_gray);
-    rl.drawText("Tab: scramble    Space: reset    Drag: orbit    Wheel: zoom    Esc: quit", 32, 120, 16, rl.Color.light_gray);
+    const panel_height: i32 = if (last.scramble.len == 0) 136 else 164;
+    const panel_color = rl.Color.init(255, 255, 255, 218);
+    const text_color = rl.Color.init(42, 48, 58, 255);
+    const muted_color = rl.Color.init(80, 91, 107, 255);
 
-    const status_width = rl.measureText(status, 24);
-    const x = rl.getScreenWidth() - status_width - 32;
-    rl.drawText(status, x, 28, 24, rl.Color.ray_white);
+    rl.drawRectangle(16, 16, 720, panel_height, panel_color);
+    rl.drawRectangleLines(16, 16, 720, panel_height, rl.Color.init(135, 169, 190, 255));
+    rl.drawText("Rubix", 32, 28, 28, text_color);
+    rl.drawText(controls_text, 32, 68, 16, muted_color);
+    rl.drawText("Arrows/Z/X: rotate cube    C: flip    0: reset orientation", 32, 94, 16, muted_color);
+    rl.drawText("Tab: scramble    Space: reset    Drag: orbit    Wheel: zoom    Esc: quit", 32, 120, 16, muted_color);
+    if (last.scramble.len != 0) {
+        rl.drawText(last.scramble, 32, 146, 16, text_color);
+    }
+
+    const status_width = rl.measureText(last.status, 24);
+    const x = @max(32, rl.getScreenWidth() - status_width - 32);
+    rl.drawText(last.status, x, 28, 24, text_color);
 }
 
 fn faceName(face: Face) []const u8 {
@@ -416,4 +445,22 @@ fn faceName(face: Face) []const u8 {
         .front => "F",
         .back => "B",
     };
+}
+
+fn scrambleNotationZ(buffer: *[128]u8, scramble: cube_mod.Scramble) [:0]const u8 {
+    var position: usize = 0;
+
+    for (scramble.moves, 0..) |move, index| {
+        if (index != 0) {
+            buffer[position] = ' ';
+            position += 1;
+        }
+
+        const name = cube_mod.moveName(move);
+        std.mem.copyForwards(u8, buffer[position .. position + name.len], name);
+        position += name.len;
+    }
+
+    buffer[position] = 0;
+    return buffer[0..position :0];
 }

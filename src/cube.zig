@@ -152,12 +152,20 @@ pub const Cube = struct {
     }
 
     pub fn scrambleWithRandom(self: *Cube, random: std.Random) Scramble {
+        const result = randomScramble(random);
+        for (result.moves) |move| {
+            self.applyMove(move);
+        }
+
+        return result;
+    }
+
+    pub fn randomScramble(random: std.Random) Scramble {
         var result: Scramble = undefined;
         var previous: ?Move = null;
 
         for (&result.moves) |*move| {
             move.* = randomMove(random, previous);
-            self.applyMove(move.*);
             previous = move.*;
         }
 
@@ -528,6 +536,17 @@ pub fn moveName(move: Move) []const u8 {
         .B => "B",
         .BPrime => "B'",
         .B2 => "B2",
+    };
+}
+
+pub fn moveFace(move: Move) Face {
+    return switch (move) {
+        .U, .UPrime, .U2 => .up,
+        .D, .DPrime, .D2 => .down,
+        .R, .RPrime, .R2 => .right,
+        .L, .LPrime, .L2 => .left,
+        .F, .FPrime, .F2 => .front,
+        .B, .BPrime, .B2 => .back,
     };
 }
 

@@ -2,15 +2,19 @@
 
 ## Project Goal
 
-Rubix is a Zig learning project focused on Rubik's Cube state, binary data manipulation, and terminal rendering.
+Rubix is a Zig learning project focused on Rubik's Cube state, binary data manipulation, interactive 3D rendering, animation, sound, and eventually CFOP learning tools.
 
-Prioritize clear code that exposes the bit operations being learned. Avoid premature abstractions that hide how cube state is packed, moved, or decoded.
+The cube should feel like a modern kids puzzle and speed cube rather than an old-school debug demo. Prefer pastel sticker colors, softer cube edges, a light playful background, and cartoony UI polish that still feels high quality.
+
+Prioritize clear code and avoid premature abstractions. The code should stay readable and should keep important cube-state bit operations visible while the project is still being used for learning.
 
 ## Current Architecture
 
-- `src/cube.zig` owns cube state and cube logic.
-- `src/render.zig` owns terminal rendering.
-- `src/main.zig` creates a cube and prints it.
+- `src/cube.zig` owns packed cube state, cube logic, moves, scramble generation, and `Cube.facelet(...)`.
+- `src/animation.zig` owns pure move-queue animation state, magnetic easing, visual turn progress, and delayed move commits.
+- `src/render3d.zig` owns raylib 3D cube drawing and held-cube orientation rendering.
+- `src/main.zig` owns the app loop, window setup, camera, input mapping, scramble/reset, and UI overlay.
+- `src/render.zig` is legacy terminal rendering unless intentionally revived later.
 - `src/root.zig` is the package module entry point.
 
 The cube state is represented as a wrapper around one `u100`:
@@ -22,6 +26,40 @@ pub const Cube = struct {
 ```
 
 There is no sticker-array state. Rendering reads colors from the packed cube bits through `Cube.facelet(...)`.
+
+## Rendering and UI Rules
+
+- Keep raylib as the active rendering backend for now.
+- Rendering must read cube state through `Cube.facelet(...)`; do not introduce a separate sticker-array source of truth.
+- Camera movement and held-cube orientation are UI/render concerns, not cube-state mutations.
+- `render3d.Orientation` changes how the cube is viewed and controlled; it must not call cube move methods or rewrite `Cube.bits`.
+- `animation.Animator` queues moves and commits them to `Cube.applyMove(...)` only when the active visual turn finishes.
+- `render3d.drawCube(...)` may receive `?animation.VisualTurn` for temporary moving-layer transforms, but the packed cube bits remain the only committed state.
+- Fast face controls are `W/S/D/A/Q/E`, with Shift making the move prime.
+- Whole-cube orientation controls should behave like rotating a real cube in hand.
+- Any new controls must be reflected in the overlay.
+- Avoid visuals that feel like a raw debug demo. Prefer a light blue or playful bright background, soft shadows, friendly UI panels, and modern pastel speed-cube colors.
+- Reduce or replace debug grid visuals as the presentation becomes more polished.
+
+## Current Animation Behavior
+
+- User face turns are queued and animated one at a time. This preserves cube-state correctness while still making rapid repeated key presses feel responsive.
+- Scramble on `Tab` resets to solved, generates a non-mutating `Cube.randomScramble(...)`, queues the scramble moves, displays the notation, and copies it to the clipboard.
+- `Cube.scrambleWithRandom(...)` still mutates the cube, but it is implemented through `Cube.randomScramble(...)` plus `Cube.applyMove(...)`.
+- Magnetic easing currently uses a quick ease-out to a small overshoot, then settles back to the exact target angle before committing the move.
+- `VisualTurn.layer_lift` gives the active layer a small bell-shaped outward lift while turning.
+- True overlapping physical turns are not implemented yet. Do not start a second physical layer turn before the active move commits unless the renderer is upgraded to handle cubie-level transforms safely.
+
+## Portability Rules
+
+The long-term goal is to ship on desktop platforms and eventually explore WebAssembly and iOS.
+
+- Avoid direct OS APIs in core logic.
+- Keep cube logic, algorithm parsing, CFOP recognition, animation state, and app state independent from raylib where practical.
+- Put platform-specific rendering, audio, window, and input concerns behind thin app-layer boundaries.
+- Prefer assets and APIs that can work on desktop and future WebAssembly builds.
+- Treat iOS as a later packaging target. Do not let iOS complexity block a more finished desktop/web-friendly product first.
+- Keep native desktop builds working before adding web or mobile build complexity.
 
 ## Bit Layout
 
@@ -121,7 +159,7 @@ Implementation assignments are the reverse form:
 UL = old.UF
 ```
 
-## Near-Term Implementation Rules
+## Cube Logic Rules
 
 - Implement raw bit movement with small helpers such as `getChunk` and `setChunk`.
 - Keep first moves explicit. Do not introduce generic cycle helpers until the raw bit manipulation is comfortable.
@@ -153,14 +191,42 @@ R:  UFR -> URB (+1), URB -> DRB (+2), DRB -> DFR (+1), DFR -> UFR (+2)
 R': UFR -> DFR (+1), DFR -> DRB (+2), DRB -> URB (+1), URB -> UFR (+2)
 ```
 
-## Future Ideas
+## Near-Term Roadmap
 
-These are not current implementation scope:
+1. Visual polish
+   - Make the app feel like a finished, cartoony, modern speed-cube puzzle.
+   - Continue improving soft cube edges, lighting, shadows, sticker bevel feel, and the friendly overlay.
+   - Add orientation aids for top/front/right without making the UI feel technical.
+   - Do a manual GUI pass on moving-layer transforms from multiple camera angles and held-cube orientations.
 
-- Better terminal rendering, possibly using an alternate terminal buffer.
-- Centered 2D terminal rendering.
-- Experimental 3D ASCII rendering.
-- Keyboard controls for moves, such as lowercase/uppercase pairs for clockwise/counterclockwise turns.
-- Scramble generation.
-- Solver algorithm.
-- CFOP helper for learning algorithms.
+2. Architecture cleanup for portability
+   - Split `main.zig` responsibilities into small modules over time: app state/input, UI overlay, and rendering.
+   - Keep pure logic modules free of raylib imports so they can be tested and reused for desktop, web, and mobile experiments.
+   - Add WebAssembly build notes once the app loop is structured for web.
+
+3. Animation and sound
+   - Tune animation duration, overshoot, layer lift, and easing after manual playtesting.
+   - Consider cubie-level transforms later if true overlapping turns become important.
+   - Add lightweight sound effects for turns, scramble, reset, solved, and invalid actions.
+   - Keep sounds optional and easy to disable for web/mobile.
+
+4. CFOP trainer foundation
+   - Add algorithm notation parsing for sequences like `R U R' U'`.
+   - Add algorithm playback through the same move queue used by input.
+   - Build helper/trainer behavior before attempting a full optimal solver.
+   - Start with beginner-friendly CFOP data: cross/F2L guidance, then 2-look OLL/PLL, then full OLL/PLL.
+
+5. Helper UI
+   - Highlight relevant cube pieces/stickers for the current learning step.
+   - Show the recommended algorithm in a child-friendly panel.
+   - Support step-through and auto-play.
+   - Eventually detect sections and suggest algorithms based on the current cube state.
+
+## Testing Expectations
+
+- Run `zig build` after code changes.
+- Run `zig build test` after changes to cube logic, app logic, parsing, animation state, or solver/trainer code.
+- For rendering changes, compile first and do a manual GUI smoke test when practical.
+- Future parser tests should cover normal moves, primes, doubles, and invalid tokens.
+- Animation tests should cover move queue order, delayed commits, clear/reset behavior, and final visual target angles.
+- Future CFOP tests should use known cube states for recognition and algorithm suggestions.
