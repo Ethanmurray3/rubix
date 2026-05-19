@@ -3,6 +3,8 @@ const rubix = @import("rubix");
 const animation = rubix.animation;
 const cube_mod = rubix.cube;
 const Cube = cube_mod.Cube;
+const Face = cube_mod.Face;
+const FaceletCoord = cube_mod.FaceletCoord;
 const Move = cube_mod.Move;
 
 fn expectSolved(cube: Cube) !void {
@@ -48,6 +50,12 @@ fn expectDoubleMove(comptime move: Move, comptime turn: fn (*Cube) void) !void {
     turn(&from_turns);
 
     try std.testing.expectEqual(from_turns.bits, from_move.bits);
+}
+
+fn expectFaceletMapping(face: Face, index: usize, expected: FaceletCoord) !void {
+    const coord = cube_mod.faceletCoord(face, index);
+    try std.testing.expectEqual(expected, coord);
+    try std.testing.expectEqual(index, cube_mod.faceletIndex(face, expected));
 }
 
 test "solved cube reports solved" {
@@ -106,6 +114,75 @@ test "move names use standard notation" {
     try std.testing.expectEqualStrings("R", cube_mod.moveName(.R));
     try std.testing.expectEqualStrings("R'", cube_mod.moveName(.RPrime));
     try std.testing.expectEqualStrings("R2", cube_mod.moveName(.R2));
+}
+
+test "facelet coordinates round trip for every facelet" {
+    const faces = [_]Face{
+        .up,
+        .down,
+        .front,
+        .back,
+        .left,
+        .right,
+    };
+
+    for (faces) |face| {
+        for (0..9) |index| {
+            const coord = cube_mod.faceletCoord(face, index);
+            try std.testing.expectEqual(index, cube_mod.faceletIndex(face, coord));
+            try std.testing.expectEqual(coord, cube_mod.faceletCoord(face, cube_mod.faceletIndex(face, coord)));
+        }
+    }
+}
+
+test "facelet coordinates preserve mirrored down back and right layouts" {
+    try expectFaceletMapping(.down, 0, .{ .x = -1, .y = -1, .z = 1 });
+    try expectFaceletMapping(.down, 2, .{ .x = 1, .y = -1, .z = 1 });
+    try expectFaceletMapping(.down, 6, .{ .x = -1, .y = -1, .z = -1 });
+    try expectFaceletMapping(.down, 8, .{ .x = 1, .y = -1, .z = -1 });
+
+    try expectFaceletMapping(.back, 0, .{ .x = 1, .y = 1, .z = -1 });
+    try expectFaceletMapping(.back, 2, .{ .x = -1, .y = 1, .z = -1 });
+    try expectFaceletMapping(.back, 6, .{ .x = 1, .y = -1, .z = -1 });
+    try expectFaceletMapping(.back, 8, .{ .x = -1, .y = -1, .z = -1 });
+
+    try expectFaceletMapping(.right, 0, .{ .x = 1, .y = 1, .z = 1 });
+    try expectFaceletMapping(.right, 2, .{ .x = 1, .y = 1, .z = -1 });
+    try expectFaceletMapping(.right, 6, .{ .x = 1, .y = -1, .z = 1 });
+    try expectFaceletMapping(.right, 8, .{ .x = 1, .y = -1, .z = -1 });
+}
+
+test "facelet coordinates cover the visible cubies and stickers" {
+    const faces = [_]Face{
+        .up,
+        .down,
+        .front,
+        .back,
+        .left,
+        .right,
+    };
+    var visible_cubies = [_]bool{false} ** 27;
+    var sticker_count: usize = 0;
+
+    for (faces) |face| {
+        for (0..9) |index| {
+            const coord = cube_mod.faceletCoord(face, index);
+            const x: usize = @intCast(@as(isize, coord.x) + 1);
+            const y: usize = @intCast(@as(isize, coord.y) + 1);
+            const z: usize = @intCast(@as(isize, coord.z) + 1);
+            visible_cubies[x * 9 + y * 3 + z] = true;
+            sticker_count += 1;
+        }
+    }
+
+    var cubie_count: usize = 0;
+    for (visible_cubies) |visible| {
+        if (visible) cubie_count += 1;
+    }
+
+    try std.testing.expectEqual(@as(usize, 26), cubie_count);
+    try std.testing.expectEqual(@as(usize, 54), sticker_count);
+    try std.testing.expect(!visible_cubies[13]);
 }
 
 test "scramble returns twenty moves and avoids adjacent axes" {

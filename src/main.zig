@@ -11,6 +11,8 @@ const Move = cube_mod.Move;
 const Axis = render3d.Axis;
 const Orientation = render3d.Orientation;
 
+const render_target_fps = 240;
+
 const CameraOrbit = struct {
     yaw: f32 = -0.75,
     pitch: f32 = 0.55,
@@ -35,8 +37,6 @@ const CameraOrbit = struct {
 const LastAction = struct {
     status: [:0]const u8 = "Solved",
     scramble: [:0]const u8 = "",
-    face: ?Face = null,
-    highlight_time: f32 = 0,
 };
 
 const ViewControls = struct {
@@ -77,7 +77,7 @@ pub fn main(init: std.process.Init) !void {
     });
     rl.initWindow(1280, 800, "Rubix");
     defer rl.closeWindow();
-    rl.setTargetFPS(60);
+    rl.setTargetFPS(render_target_fps);
 
     var orbit: CameraOrbit = .{};
     var orientation: Orientation = .{};
@@ -97,8 +97,6 @@ pub fn main(init: std.process.Init) !void {
             last = .{
                 .status = "Reoriented",
                 .scramble = last.scramble,
-                .face = null,
-                .highlight_time = 0,
             };
         }
 
@@ -107,8 +105,6 @@ pub fn main(init: std.process.Init) !void {
                 last = .{
                     .status = moveNameZ(move),
                     .scramble = "",
-                    .face = cube_mod.moveFace(move),
-                    .highlight_time = 0.18,
                 };
             }
         }
@@ -123,8 +119,6 @@ pub fn main(init: std.process.Init) !void {
             last = .{
                 .status = "Scrambling",
                 .scramble = notation,
-                .face = null,
-                .highlight_time = 0.18,
             };
         }
 
@@ -135,26 +129,19 @@ pub fn main(init: std.process.Init) !void {
             last = .{
                 .status = "Solved",
                 .scramble = "",
-                .face = null,
-                .highlight_time = 0,
             };
         }
 
         if (animator.update(frame_time, &cube)) |move| {
             last.status = moveNameZ(move);
-            last.face = cube_mod.moveFace(move);
-            last.highlight_time = 0.18;
         }
 
         if (animator.activeMove()) |move| {
             last.status = moveNameZ(move);
-            last.face = cube_mod.moveFace(move);
-            last.highlight_time = 0.18;
         } else if (cube.isSolved() and animator.isIdle()) {
             last.status = "Solved";
         }
 
-        last.highlight_time = @max(0, last.highlight_time - frame_time);
         draw(cube, camera, orientation, last, controls, animator.visualTurn());
     }
 }
@@ -390,15 +377,10 @@ fn draw(
     rl.clearBackground(rl.Color.init(180, 221, 245, 255));
 
     camera.begin();
-    render3d.drawCube(cube, orientation, visual_turn, last.face, highlightAlpha(last.highlight_time));
+    render3d.drawCube(cube, orientation, visual_turn);
     camera.end();
 
     drawOverlay(last, controls);
-}
-
-fn highlightAlpha(time_left: f32) u8 {
-    const ratio = std.math.clamp(time_left / 0.18, 0, 1);
-    return @intFromFloat(ratio * 90.0);
 }
 
 fn drawOverlay(last: LastAction, controls: ViewControls) void {

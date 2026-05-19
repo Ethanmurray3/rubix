@@ -5,6 +5,7 @@ const cube_mod = @import("cube.zig");
 const Cube = cube_mod.Cube;
 const CubeColor = cube_mod.Color;
 const Face = cube_mod.Face;
+const FaceletCoord = cube_mod.FaceletCoord;
 
 pub const Axis = enum {
     positive_x,
@@ -61,108 +62,114 @@ pub const Orientation = struct {
     }
 };
 
-const spacing: f32 = 1.04;
-const core_size: f32 = 3.0;
-const face_coord: f32 = 1.54;
-const sticker_size: f32 = 0.88;
-const sticker_thickness: f32 = 0.08;
+const cubie_spacing: f32 = 1.04;
+const cubie_size: f32 = 0.94;
+const sticker_size: f32 = 0.74;
+const sticker_thickness: f32 = 0.055;
+const sticker_offset: f32 = (cubie_size + sticker_thickness) * 0.5 + 0.012;
+const coord_values = [_]i2{ -1, 0, 1 };
 
 pub fn drawCube(
     cube: Cube,
     orientation: Orientation,
     visual_turn: ?animation.VisualTurn,
-    highlight_face: ?Face,
-    highlight_alpha: u8,
 ) void {
-    rl.drawCubeV(
-        vec3(0, 0, 0),
-        vec3(core_size, core_size, core_size),
-        rl.Color.init(35, 38, 43, 255),
-    );
-    rl.drawCubeWiresV(
-        vec3(0, 0, 0),
-        vec3(core_size, core_size, core_size),
-        rl.Color.init(17, 18, 21, 255),
-    );
-
-    drawFace(cube, orientation, visual_turn, .up);
-    drawFace(cube, orientation, visual_turn, .down);
-    drawFace(cube, orientation, visual_turn, .front);
-    drawFace(cube, orientation, visual_turn, .back);
-    drawFace(cube, orientation, visual_turn, .left);
-    drawFace(cube, orientation, visual_turn, .right);
-
-    if (highlight_face) |face| {
-        if (highlight_alpha > 0) drawHighlight(orientation, face, highlight_alpha);
-    }
-}
-
-fn drawFace(cube: Cube, orientation: Orientation, visual_turn: ?animation.VisualTurn, face: Face) void {
-    for (0..3) |row| {
-        for (0..3) |col| {
-            const index = row * 3 + col;
-            const sticker = stickerTransform(face, row, col);
-            const color = rayColor(cube.facelet(face, index));
-            if (visual_turn) |turn| {
-                if (stickerInMovingLayer(sticker.position, turn.face)) {
-                    drawAnimatedSticker(orientation, sticker, color, turn);
-                    continue;
-                }
+    for (coord_values) |x| {
+        for (coord_values) |y| {
+            for (coord_values) |z| {
+                if (x == 0 and y == 0 and z == 0) continue;
+                drawCubie(
+                    cube,
+                    orientation,
+                    visual_turn,
+                    .{ .x = x, .y = y, .z = z },
+                );
             }
-            drawStaticSticker(orientation, sticker, color);
         }
     }
 }
 
-fn drawStaticSticker(orientation: Orientation, sticker: StickerTransform, color: rl.Color) void {
-    rl.drawCubeV(
-        orientation.transformPosition(sticker.position),
-        orientation.transformSize(sticker.size),
-        color,
-    );
-    rl.drawCubeWiresV(
-        orientation.transformPosition(sticker.position),
-        orientation.transformSize(sticker.size),
-        rl.Color.init(22, 24, 28, 255),
-    );
+fn drawCubie(
+    cube: Cube,
+    orientation: Orientation,
+    visual_turn: ?animation.VisualTurn,
+    coord: FaceletCoord,
+) void {
+    if (visual_turn) |turn| {
+        if (cubieInMovingLayer(coord, turn.face)) {
+            drawTransformedCubie(cube, orientation, coord, turn.face, turn.angle_degrees, turn.layer_lift);
+            return;
+        }
+
+        if (cubieInNeighborLayer(coord, turn.face) and turn.neighbor_give_degrees > 0) {
+            const give_angle = if (turn.angle_degrees < 0) -turn.neighbor_give_degrees else turn.neighbor_give_degrees;
+            drawTransformedCubie(cube, orientation, coord, turn.face, give_angle, 0);
+            return;
+        }
+    }
+
+    drawStaticCubie(cube, orientation, coord);
 }
 
-fn drawAnimatedSticker(
+fn drawStaticCubie(cube: Cube, orientation: Orientation, coord: FaceletCoord) void {
+    drawCubieBody(
+        orientation.transformPosition(cubieCenter(coord)),
+        orientation.transformSize(vec3(cubie_size, cubie_size, cubie_size)),
+    );
+
+    inline for (.{ Face.up, Face.down, Face.front, Face.back, Face.left, Face.right }) |face| {
+        if (coordOnFace(coord, face)) {
+            const sticker = stickerTransform(coord, face);
+            const index = cube_mod.faceletIndex(face, coord);
+            drawSticker(
+                orientation.transformPosition(sticker.position),
+                orientation.transformSize(sticker.size),
+                rayColor(cube.facelet(face, index)),
+            );
+        }
+    }
+}
+
+fn drawTransformedCubie(
+    cube: Cube,
     orientation: Orientation,
-    sticker: StickerTransform,
-    color: rl.Color,
-    turn: animation.VisualTurn,
+    coord: FaceletCoord,
+    turn_face: Face,
+    angle_degrees: f32,
+    layer_lift: f32,
 ) void {
-    const normal = faceNormal(turn.face);
+    const normal = faceNormal(turn_face);
 
     rl.gl.rlPushMatrix();
     defer rl.gl.rlPopMatrix();
 
     applyOrientation(orientation);
     rl.gl.rlTranslatef(
-        normal.x * turn.layer_lift,
-        normal.y * turn.layer_lift,
-        normal.z * turn.layer_lift,
+        normal.x * layer_lift,
+        normal.y * layer_lift,
+        normal.z * layer_lift,
     );
-    rl.gl.rlRotatef(turn.angle_degrees, normal.x, normal.y, normal.z);
+    rl.gl.rlRotatef(angle_degrees, normal.x, normal.y, normal.z);
 
-    rl.drawCubeV(sticker.position, sticker.size, color);
-    rl.drawCubeWiresV(sticker.position, sticker.size, rl.Color.init(22, 24, 28, 255));
+    drawCubieBody(cubieCenter(coord), vec3(cubie_size, cubie_size, cubie_size));
+
+    inline for (.{ Face.up, Face.down, Face.front, Face.back, Face.left, Face.right }) |face| {
+        if (coordOnFace(coord, face)) {
+            const sticker = stickerTransform(coord, face);
+            const index = cube_mod.faceletIndex(face, coord);
+            drawSticker(sticker.position, sticker.size, rayColor(cube.facelet(face, index)));
+        }
+    }
 }
 
-fn drawHighlight(orientation: Orientation, face: Face, alpha: u8) void {
-    const highlight_size: f32 = 3.08;
-    const thickness: f32 = 0.06;
-    const color = rl.Color.init(255, 255, 255, alpha);
+fn drawCubieBody(position: rl.Vector3, size: rl.Vector3) void {
+    rl.drawCubeV(position, size, rl.Color.init(38, 42, 48, 255));
+    rl.drawCubeWiresV(position, size, rl.Color.init(21, 24, 29, 190));
+}
 
-    switch (face) {
-        .up => drawOrientedCube(orientation, vec3(0, face_coord + 0.04, 0), vec3(highlight_size, thickness, highlight_size), color),
-        .down => drawOrientedCube(orientation, vec3(0, -face_coord - 0.04, 0), vec3(highlight_size, thickness, highlight_size), color),
-        .front => drawOrientedCube(orientation, vec3(0, 0, face_coord + 0.04), vec3(highlight_size, highlight_size, thickness), color),
-        .back => drawOrientedCube(orientation, vec3(0, 0, -face_coord - 0.04), vec3(highlight_size, highlight_size, thickness), color),
-        .left => drawOrientedCube(orientation, vec3(-face_coord - 0.04, 0, 0), vec3(thickness, highlight_size, highlight_size), color),
-        .right => drawOrientedCube(orientation, vec3(face_coord + 0.04, 0, 0), vec3(thickness, highlight_size, highlight_size), color),
-    }
+fn drawSticker(position: rl.Vector3, size: rl.Vector3, color: rl.Color) void {
+    rl.drawCubeV(position, size, color);
+    rl.drawCubeWiresV(position, size, rl.Color.init(22, 24, 28, 210));
 }
 
 const StickerTransform = struct {
@@ -170,47 +177,66 @@ const StickerTransform = struct {
     size: rl.Vector3,
 };
 
-fn stickerTransform(face: Face, row: usize, col: usize) StickerTransform {
-    const col_pos = (@as(f32, @floatFromInt(col)) - 1.0) * spacing;
-    const row_pos = (1.0 - @as(f32, @floatFromInt(row))) * spacing;
+fn cubieCenter(coord: FaceletCoord) rl.Vector3 {
+    return vec3(
+        @as(f32, @floatFromInt(coord.x)) * cubie_spacing,
+        @as(f32, @floatFromInt(coord.y)) * cubie_spacing,
+        @as(f32, @floatFromInt(coord.z)) * cubie_spacing,
+    );
+}
+
+fn stickerTransform(coord: FaceletCoord, face: Face) StickerTransform {
+    const center = cubieCenter(coord);
+    const normal = faceNormal(face);
 
     return switch (face) {
         .up => .{
-            .position = vec3(col_pos, face_coord, -row_pos),
+            .position = add(center, scale(normal, sticker_offset)),
             .size = vec3(sticker_size, sticker_thickness, sticker_size),
         },
         .down => .{
-            .position = vec3(col_pos, -face_coord, row_pos),
+            .position = add(center, scale(normal, sticker_offset)),
             .size = vec3(sticker_size, sticker_thickness, sticker_size),
         },
         .front => .{
-            .position = vec3(col_pos, row_pos, face_coord),
+            .position = add(center, scale(normal, sticker_offset)),
             .size = vec3(sticker_size, sticker_size, sticker_thickness),
         },
         .back => .{
-            .position = vec3(-col_pos, row_pos, -face_coord),
+            .position = add(center, scale(normal, sticker_offset)),
             .size = vec3(sticker_size, sticker_size, sticker_thickness),
         },
         .left => .{
-            .position = vec3(-face_coord, row_pos, col_pos),
+            .position = add(center, scale(normal, sticker_offset)),
             .size = vec3(sticker_thickness, sticker_size, sticker_size),
         },
         .right => .{
-            .position = vec3(face_coord, row_pos, -col_pos),
+            .position = add(center, scale(normal, sticker_offset)),
             .size = vec3(sticker_thickness, sticker_size, sticker_size),
         },
     };
 }
 
-fn stickerInMovingLayer(position: rl.Vector3, face: Face) bool {
-    const threshold: f32 = 0.5;
+fn coordOnFace(coord: FaceletCoord, face: Face) bool {
     return switch (face) {
-        .up => position.y > threshold,
-        .down => position.y < -threshold,
-        .front => position.z > threshold,
-        .back => position.z < -threshold,
-        .left => position.x < -threshold,
-        .right => position.x > threshold,
+        .up => coord.y == 1,
+        .down => coord.y == -1,
+        .front => coord.z == 1,
+        .back => coord.z == -1,
+        .left => coord.x == -1,
+        .right => coord.x == 1,
+    };
+}
+
+fn cubieInMovingLayer(coord: FaceletCoord, face: Face) bool {
+    return coordOnFace(coord, face);
+}
+
+fn cubieInNeighborLayer(coord: FaceletCoord, face: Face) bool {
+    return switch (face) {
+        .up, .down => coord.y == 0,
+        .front, .back => coord.z == 0,
+        .left, .right => coord.x == 0,
     };
 }
 
@@ -248,10 +274,6 @@ fn rayColor(color: CubeColor) rl.Color {
         .orange => rl.Color.init(255, 164, 93, 255),
         .red => rl.Color.init(246, 92, 104, 255),
     };
-}
-
-fn drawOrientedCube(orientation: Orientation, position: rl.Vector3, size: rl.Vector3, color: rl.Color) void {
-    rl.drawCubeV(orientation.transformPosition(position), orientation.transformSize(size), color);
 }
 
 fn rotateAxis(axis: Axis, around: Axis, positive: bool) Axis {
@@ -317,6 +339,22 @@ fn cross(a: rl.Vector3, b: rl.Vector3) rl.Vector3 {
 
 fn absAxisComponent(component: f32) f32 {
     return if (component < 0) -component else component;
+}
+
+fn add(a: rl.Vector3, b: rl.Vector3) rl.Vector3 {
+    return .{
+        .x = a.x + b.x,
+        .y = a.y + b.y,
+        .z = a.z + b.z,
+    };
+}
+
+fn scale(vector: rl.Vector3, amount: f32) rl.Vector3 {
+    return .{
+        .x = vector.x * amount,
+        .y = vector.y * amount,
+        .z = vector.z * amount,
+    };
 }
 
 fn vec3(x: f32, y: f32, z: f32) rl.Vector3 {

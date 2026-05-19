@@ -18,6 +18,12 @@ pub const Face = enum(u3) {
     right,
 };
 
+pub const FaceletCoord = struct {
+    x: i2,
+    y: i2,
+    z: i2,
+};
+
 pub const Corner = enum(u3) {
     ufr,
     urb,
@@ -550,6 +556,82 @@ pub fn moveFace(move: Move) Face {
     };
 }
 
+pub fn faceletCoord(face: Face, index: usize) FaceletCoord {
+    std.debug.assert(index < 9);
+
+    const row = index / 3;
+    const col = index % 3;
+    const x = axisCoordFromGrid(col);
+    const y = axisCoordFromGrid(2 - row);
+    const z = axisCoordFromGrid(2 - row);
+
+    return switch (face) {
+        .up => .{
+            .x = x,
+            .y = 1,
+            .z = axisCoordFromGrid(row),
+        },
+        .down => .{
+            .x = x,
+            .y = -1,
+            .z = z,
+        },
+        .front => .{
+            .x = x,
+            .y = y,
+            .z = 1,
+        },
+        .back => .{
+            .x = axisCoordFromGrid(2 - col),
+            .y = y,
+            .z = -1,
+        },
+        .left => .{
+            .x = -1,
+            .y = y,
+            .z = x,
+        },
+        .right => .{
+            .x = 1,
+            .y = y,
+            .z = axisCoordFromGrid(2 - col),
+        },
+    };
+}
+
+pub fn faceletIndex(face: Face, coord: FaceletCoord) usize {
+    assertAxisCoord(coord.x);
+    assertAxisCoord(coord.y);
+    assertAxisCoord(coord.z);
+
+    return switch (face) {
+        .up => block: {
+            std.debug.assert(coord.y == 1);
+            break :block faceletIndexFromRowCol(gridFromAxisCoord(coord.z), gridFromAxisCoord(coord.x));
+        },
+        .down => block: {
+            std.debug.assert(coord.y == -1);
+            break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.z), gridFromAxisCoord(coord.x));
+        },
+        .front => block: {
+            std.debug.assert(coord.z == 1);
+            break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(coord.x));
+        },
+        .back => block: {
+            std.debug.assert(coord.z == -1);
+            break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(-coord.x));
+        },
+        .left => block: {
+            std.debug.assert(coord.x == -1);
+            break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(coord.z));
+        },
+        .right => block: {
+            std.debug.assert(coord.x == 1);
+            break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(-coord.z));
+        },
+    };
+}
+
 fn randomMove(random: std.Random, previous: ?Move) Move {
     while (true) {
         const move = random.enumValue(Move);
@@ -557,6 +639,26 @@ fn randomMove(random: std.Random, previous: ?Move) Move {
             return move;
         }
     }
+}
+
+fn axisCoordFromGrid(value: usize) i2 {
+    std.debug.assert(value < 3);
+    return @intCast(@as(isize, @intCast(value)) - 1);
+}
+
+fn gridFromAxisCoord(value: i2) usize {
+    assertAxisCoord(value);
+    return @intCast(@as(isize, value) + 1);
+}
+
+fn faceletIndexFromRowCol(row: usize, col: usize) usize {
+    std.debug.assert(row < 3);
+    std.debug.assert(col < 3);
+    return row * 3 + col;
+}
+
+fn assertAxisCoord(value: i2) void {
+    std.debug.assert(value >= -1 and value <= 1);
 }
 
 fn makeCornerChunk(piece: Corner, orientation: u2) u5 {

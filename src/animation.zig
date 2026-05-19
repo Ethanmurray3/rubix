@@ -6,14 +6,15 @@ const Face = cube_mod.Face;
 const Move = cube_mod.Move;
 const Scramble = cube_mod.Scramble;
 
-pub const default_user_turn_duration: f32 = 0.105;
-pub const default_scramble_turn_duration: f32 = 0.075;
+pub const default_user_turn_duration: f32 = 0.16;
+pub const default_scramble_turn_duration: f32 = 0.115;
 pub const queue_capacity = 128;
 
 pub const VisualTurn = struct {
     face: Face,
     angle_degrees: f32,
     layer_lift: f32,
+    neighbor_give_degrees: f32 = 0,
 };
 
 const QueuedMove = struct {
@@ -112,29 +113,37 @@ pub const Animator = struct {
 };
 
 pub fn visualTurnForProgress(move: Move, progress: f32) VisualTurn {
-    const clamped = std.math.clamp(progress, 0, 1);
+    const clamped = clampProgress(progress);
+    const spring = magneticProgress(clamped);
+    const lift = bellProgress(clamped);
     return .{
         .face = cube_mod.moveFace(move),
-        .angle_degrees = targetAngle(move) * magneticProgress(clamped),
-        .layer_lift = 0.055 * @sin(std.math.pi * clamped),
+        .angle_degrees = targetAngle(move) * spring,
+        .layer_lift = 0.055 * lift,
+        .neighbor_give_degrees = 2.2 * lift * (1.0 - 0.18 * clamped),
     };
 }
 
 fn magneticProgress(progress: f32) f32 {
-    const overshoot: f32 = 1.04;
-    const overshoot_time: f32 = 0.72;
+    if (progress <= 0) return 0;
+    if (progress >= 1) return 1;
 
-    if (progress < overshoot_time) {
-        return overshoot * easeOutCubic(progress / overshoot_time);
-    }
-
-    const settle = (progress - overshoot_time) / (1.0 - overshoot_time);
-    return overshoot + (1.0 - overshoot) * easeOutCubic(settle);
+    const tension: f32 = 0.78;
+    const c3 = tension + 1.0;
+    const t = progress - 1.0;
+    return 1.0 + c3 * t * t * t + tension * t * t;
 }
 
-fn easeOutCubic(value: f32) f32 {
-    const inverse = 1.0 - value;
-    return 1.0 - inverse * inverse * inverse;
+fn bellProgress(progress: f32) f32 {
+    if (progress <= 0 or progress >= 1) return 0;
+    return @max(0, @sin(std.math.pi * progress));
+}
+
+fn clampProgress(progress: f32) f32 {
+    if (std.math.isNan(progress)) return 0;
+    if (progress <= 0) return 0;
+    if (progress >= 1) return 1;
+    return progress;
 }
 
 fn targetAngle(move: Move) f32 {
@@ -143,4 +152,77 @@ fn targetAngle(move: Move) f32 {
         .U2, .D2, .R2, .L2, .F2, .B2 => -180,
         else => -90,
     };
+}
+
+test "visual turn starts at zero and finishes exactly on target" {
+    const start = visualTurnForProgress(.R, 0);
+    try std.testing.expectEqual(Face.right, start.face);
+    try std.testing.expectEqual(@as(f32, -0.0), start.angle_degrees);
+    try std.testing.expectEqual(@as(f32, 0), start.layer_lift);
+    try std.testing.expectEqual(@as(f32, 0), start.neighbor_give_degrees);
+
+    const finish = visualTurnForProgress(.R, 1);
+    try std.testing.expectEqual(Face.right, finish.face);
+    try std.testing.expectEqual(@as(f32, -90), finish.angle_degrees);
+    try std.testing.expectEqual(@as(f32, 0), finish.layer_lift);
+    try std.testing.expectEqual(@as(f32, 0), finish.neighbor_give_degrees);
+
+    const double = visualTurnForProgress(.U2, 1);
+    try std.testing.expectEqual(@as(f32, -180), double.angle_degrees);
+}
+
+test "magnetic easing overshoots mildly before settling" {
+    const mid = visualTurnForProgress(.R, 0.68);
+    try std.testing.expect(mid.angle_degrees < -90);
+    try std.testing.expect(mid.angle_degrees > -94);
+
+    const prime = visualTurnForProgress(.RPrime, 0.68);
+    try std.testing.expect(prime.angle_degrees > 90);
+    try std.testing.expect(prime.angle_degrees < 94);
+}
+
+test "visual values stay finite and bounded for invalid progress inputs" {
+    const cases = [_]f32{
+        -10,
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1,
+        10,
+        std.math.nan(f32),
+        std.math.inf(f32),
+        -std.math.inf(f32),
+    };
+
+    for (cases) |progress| {
+        const visual = visualTurnForProgress(.F, progress);
+        try std.testing.expect(std.math.isFinite(visual.angle_degrees));
+        try std.testing.expect(std.math.isFinite(visual.layer_lift));
+        try std.testing.expect(std.math.isFinite(visual.neighbor_give_degrees));
+        try std.testing.expect(@abs(visual.angle_degrees) <= 94);
+        try std.testing.expect(visual.layer_lift >= 0);
+        try std.testing.expect(visual.layer_lift <= 0.055);
+        try std.testing.expect(visual.neighbor_give_degrees >= 0);
+        try std.testing.expect(visual.neighbor_give_degrees <= 2.2);
+    }
+}
+
+test "animator commits active move once after visual turn finishes" {
+    var cube = Cube.solved();
+    const solved_bits = cube.bits;
+    var animator = Animator{};
+
+    try std.testing.expect(animator.enqueue(.R));
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.05, &cube));
+    try std.testing.expectEqual(solved_bits, cube.bits);
+    try std.testing.expectEqual(@as(?Move, .R), animator.activeMove());
+
+    try std.testing.expectEqual(@as(?Move, .R), animator.update(default_user_turn_duration, &cube));
+    const turned_bits = cube.bits;
+    try std.testing.expect(turned_bits != solved_bits);
+    try std.testing.expectEqual(@as(?Move, null), animator.activeMove());
+
+    try std.testing.expectEqual(@as(?Move, null), animator.update(default_user_turn_duration, &cube));
+    try std.testing.expectEqual(turned_bits, cube.bits);
 }

@@ -47,6 +47,7 @@ There is no sticker-array state. Rendering reads colors from the packed cube bit
 - Scramble on `Tab` resets to solved, generates a non-mutating `Cube.randomScramble(...)`, queues the scramble moves, displays the notation, and copies it to the clipboard.
 - `Cube.scrambleWithRandom(...)` still mutates the cube, but it is implemented through `Cube.randomScramble(...)` plus `Cube.applyMove(...)`.
 - Magnetic easing currently uses a quick ease-out to a small overshoot, then settles back to the exact target angle before committing the move.
+- Default turn durations are tuned for more visible frames: user turns are about `0.16s`, scramble turns are about `0.115s`, and the app requests a high render target FPS while still respecting vsync.
 - `VisualTurn.layer_lift` gives the active layer a small bell-shaped outward lift while turning.
 - True overlapping physical turns are not implemented yet. Do not start a second physical layer turn before the active move commits unless the renderer is upgraded to handle cubie-level transforms safely.
 
