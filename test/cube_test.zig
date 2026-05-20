@@ -188,38 +188,24 @@ test "scramble returns twenty moves and avoids adjacent axes" {
     var prng = std.Random.DefaultPrng.init(12345);
     const random = prng.random();
 
-    var cube = Cube.solved();
-    const scramble = cube.scrambleWithRandom(random);
+    const scramble = Cube.scramble(random);
 
     try std.testing.expectEqual(@as(usize, cube_mod.scramble_length), scramble.moves.len);
-    try std.testing.expect(!cube.isSolved());
 
     for (scramble.moves[1..], 1..) |move, index| {
         try std.testing.expect(cube_mod.moveAxis(move) != cube_mod.moveAxis(scramble.moves[index - 1]));
     }
 }
 
-test "random scramble does not mutate solved cube" {
+test "scramble can be applied explicitly to a cube" {
     var prng = std.Random.DefaultPrng.init(12345);
     const random = prng.random();
 
-    const cube = Cube.solved();
-    const scramble = Cube.randomScramble(random);
-
-    try std.testing.expectEqual(@as(usize, cube_mod.scramble_length), scramble.moves.len);
-    try expectSolved(cube);
-
-    for (scramble.moves[1..], 1..) |move, index| {
-        try std.testing.expect(cube_mod.moveAxis(move) != cube_mod.moveAxis(scramble.moves[index - 1]));
-    }
-}
-
-test "scramble with random still mutates cube" {
-    var prng = std.Random.DefaultPrng.init(12345);
-    const random = prng.random();
-
+    const scramble = Cube.scramble(random);
     var cube = Cube.solved();
-    _ = cube.scrambleWithRandom(random);
+    for (scramble.moves) |move| {
+        cube.applyMove(move);
+    }
 
     try std.testing.expect(!cube.isSolved());
 }

@@ -149,29 +149,18 @@ pub const Cube = struct {
         return self.bits == solved_bits;
     }
 
-    pub fn scramble(self: *Cube, io: std.Io) Scramble {
-        var seed: u64 = undefined;
-        io.random(std.mem.asBytes(&seed));
-
-        var prng = std.Random.DefaultPrng.init(seed);
-        return self.scrambleWithRandom(prng.random());
-    }
-
-    pub fn scrambleWithRandom(self: *Cube, random: std.Random) Scramble {
-        const result = randomScramble(random);
-        for (result.moves) |move| {
-            self.applyMove(move);
-        }
-
-        return result;
-    }
-
-    pub fn randomScramble(random: std.Random) Scramble {
+    pub fn scramble(random: std.Random) Scramble {
         var result: Scramble = undefined;
         var previous: ?Move = null;
 
         for (&result.moves) |*move| {
-            move.* = randomMove(random, previous);
+            while (true) {
+                const candidate = random.enumValue(Move);
+                if (previous == null or moveAxis(candidate) != moveAxis(previous.?)) {
+                    move.* = candidate;
+                    break;
+                }
+            }
             previous = move.*;
         }
 
@@ -632,15 +621,6 @@ pub fn faceletIndex(face: Face, coord: FaceletCoord) usize {
     };
 }
 
-fn randomMove(random: std.Random, previous: ?Move) Move {
-    while (true) {
-        const move = random.enumValue(Move);
-        if (previous == null or moveAxis(move) != moveAxis(previous.?)) {
-            return move;
-        }
-    }
-}
-
 fn axisCoordFromGrid(value: usize) i2 {
     std.debug.assert(value < 3);
     return @intCast(@as(isize, @intCast(value)) - 1);
@@ -784,9 +764,4 @@ fn edgeColors(edge: Edge) [2]Color {
         .db => .{ .yellow, .blue },
         .dl => .{ .yellow, .orange },
     };
-}
-
-comptime {
-    std.debug.assert(@bitSizeOf(CubeBits) == 100);
-    std.debug.assert(@sizeOf(Cube) == @sizeOf(CubeBits));
 }

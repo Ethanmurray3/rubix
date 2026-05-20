@@ -2,14 +2,14 @@ const std = @import("std");
 const rl = @import("raylib");
 const animation = @import("animation.zig");
 const cube_mod = @import("cube.zig");
-const render3d = @import("render3d.zig");
+const render = @import("render.zig");
 
 const Animator = animation.Animator;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
 const Move = cube_mod.Move;
-const Axis = render3d.Axis;
-const Orientation = render3d.Orientation;
+const Axis = render.Axis;
+const Orientation = render.Orientation;
 
 const render_target_fps = 240;
 
@@ -112,7 +112,7 @@ pub fn main(init: std.process.Init) !void {
         if (rl.isKeyPressed(.tab)) {
             cube = Cube.solved();
             animator.clear();
-            const scramble = Cube.randomScramble(prng.random());
+            const scramble = Cube.scramble(prng.random());
             animator.enqueueScramble(scramble);
             const notation = scrambleNotationZ(&scramble_buffer, scramble);
             rl.setClipboardText(notation);
@@ -259,11 +259,11 @@ fn cameraViewAxes(camera: rl.Camera3D) ViewAxes {
 fn viewControls(view_axes: ViewAxes, orientation: Orientation) ViewControls {
     return .{
         .up = orientation.faceOnWorldAxis(view_axes.up),
-        .down = orientation.faceOnWorldAxis(render3d.oppositeAxis(view_axes.up)),
+        .down = orientation.faceOnWorldAxis(render.oppositeAxis(view_axes.up)),
         .right = orientation.faceOnWorldAxis(view_axes.right),
-        .left = orientation.faceOnWorldAxis(render3d.oppositeAxis(view_axes.right)),
+        .left = orientation.faceOnWorldAxis(render.oppositeAxis(view_axes.right)),
         .front = orientation.faceOnWorldAxis(view_axes.front),
-        .back = orientation.faceOnWorldAxis(render3d.oppositeAxis(view_axes.front)),
+        .back = orientation.faceOnWorldAxis(render.oppositeAxis(view_axes.front)),
     };
 }
 
@@ -272,7 +272,7 @@ fn nearestAxis(vector: rl.Vector3) Axis {
     var best = -std.math.inf(f32);
 
     for (axes) |axis| {
-        const score = dot(vector, render3d.axisVector(axis));
+        const score = dot(vector, render.axisVector(axis));
         if (score > best) {
             best = score;
             result = axis;
@@ -292,7 +292,7 @@ fn nearestAxisExcept(vector: rl.Vector3, first_blocked: Axis, second_blocked: ?A
             if (sameAxisLine(axis, blocked)) continue;
         }
 
-        const score = dot(vector, render3d.axisVector(axis));
+        const score = dot(vector, render.axisVector(axis));
         if (score > best) {
             best = score;
             result = axis;
@@ -377,7 +377,7 @@ fn draw(
     rl.clearBackground(rl.Color.init(180, 221, 245, 255));
 
     camera.begin();
-    render3d.drawCube(cube, orientation, visual_turn);
+    render.drawCube(cube, orientation, visual_turn);
     camera.end();
 
     drawOverlay(last, controls);

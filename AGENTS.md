@@ -12,9 +12,8 @@ Prioritize clear code and avoid premature abstractions. The code should stay rea
 
 - `src/cube.zig` owns packed cube state, cube logic, moves, scramble generation, and `Cube.facelet(...)`.
 - `src/animation.zig` owns pure move-queue animation state, magnetic easing, visual turn progress, and delayed move commits.
-- `src/render3d.zig` owns raylib 3D cube drawing and held-cube orientation rendering.
+- `src/render.zig` owns raylib 3D cube drawing and held-cube orientation rendering.
 - `src/main.zig` owns the app loop, window setup, camera, input mapping, scramble/reset, and UI overlay.
-- `src/render.zig` is legacy terminal rendering unless intentionally revived later.
 - `src/root.zig` is the package module entry point.
 
 The cube state is represented as a wrapper around one `u100`:
@@ -32,9 +31,9 @@ There is no sticker-array state. Rendering reads colors from the packed cube bit
 - Keep raylib as the active rendering backend for now.
 - Rendering must read cube state through `Cube.facelet(...)`; do not introduce a separate sticker-array source of truth.
 - Camera movement and held-cube orientation are UI/render concerns, not cube-state mutations.
-- `render3d.Orientation` changes how the cube is viewed and controlled; it must not call cube move methods or rewrite `Cube.bits`.
+- `render.Orientation` changes how the cube is viewed and controlled; it must not call cube move methods or rewrite `Cube.bits`.
 - `animation.Animator` queues moves and commits them to `Cube.applyMove(...)` only when the active visual turn finishes.
-- `render3d.drawCube(...)` may receive `?animation.VisualTurn` for temporary moving-layer transforms, but the packed cube bits remain the only committed state.
+- `render.drawCube(...)` may receive `?animation.VisualTurn` for temporary moving-layer transforms, but the packed cube bits remain the only committed state.
 - Fast face controls are `W/S/D/A/Q/E`, with Shift making the move prime.
 - Whole-cube orientation controls should behave like rotating a real cube in hand.
 - Any new controls must be reflected in the overlay.
@@ -44,8 +43,7 @@ There is no sticker-array state. Rendering reads colors from the packed cube bit
 ## Current Animation Behavior
 
 - User face turns are queued and animated one at a time. This preserves cube-state correctness while still making rapid repeated key presses feel responsive.
-- Scramble on `Tab` resets to solved, generates a non-mutating `Cube.randomScramble(...)`, queues the scramble moves, displays the notation, and copies it to the clipboard.
-- `Cube.scrambleWithRandom(...)` still mutates the cube, but it is implemented through `Cube.randomScramble(...)` plus `Cube.applyMove(...)`.
+- Scramble on `Tab` resets to solved, generates a non-mutating `Cube.scramble(...)`, queues the scramble moves, displays the notation, and copies it to the clipboard.
 - Magnetic easing currently uses a quick ease-out to a small overshoot, then settles back to the exact target angle before committing the move.
 - Default turn durations are tuned for more visible frames: user turns are about `0.16s`, scramble turns are about `0.115s`, and the app requests a high render target FPS while still respecting vsync.
 - `VisualTurn.layer_lift` gives the active layer a small bell-shaped outward lift while turning.
