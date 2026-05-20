@@ -8,46 +8,45 @@ const Scramble = cube_mod.Scramble;
 
 pub const default_user_turn_duration: f32 = 0.16;
 pub const default_scramble_turn_duration: f32 = 0.115;
-pub const queue_capacity = 128;
 
 pub const VisualTurn = struct {
     face: Face,
     angle_degrees: f32,
-    layer_lift: f32,
-    neighbor_give_degrees: f32 = 0,
-};
-
-const QueuedMove = struct {
-    move: Move,
-    duration: f32,
 };
 
 const ActiveTurn = struct {
     move: Move,
     elapsed: f32,
     duration: f32,
+
+    fn progress(self: ActiveTurn) f32 {
+        if (self.duration <= 0) return 1;
+        return std.math.clamp(self.elapsed / self.duration, 0, 1);
+    }
 };
 
-pub const Animator = struct {
-    queue: [queue_capacity]QueuedMove = undefined,
-    head: usize = 0,
-    len: usize = 0,
+pub const PlayerAnimator = struct {
     active: ?ActiveTurn = null,
-    user_turn_duration: f32 = default_user_turn_duration,
-    scramble_turn_duration: f32 = default_scramble_turn_duration,
+    pending: ?Move = null,
+    turn_duration: f32 = default_user_turn_duration,
 
-    pub fn enqueue(self: *Animator, move: Move) bool {
-        return self.enqueueWithDuration(move, self.user_turn_duration);
+    pub fn submit(self: *PlayerAnimator, move: Move) void {
+        if (self.tryStart(move)) return;
+        self.pending = move;
     }
 
-    pub fn enqueueScramble(self: *Animator, scramble: Scramble) void {
-        for (scramble.moves) |move| {
-            _ = self.enqueueWithDuration(move, self.scramble_turn_duration);
-        }
+    fn tryStart(self: *PlayerAnimator, move: Move) bool {
+        if (self.active != null) return false;
+
+        self.active = .{
+            .move = move,
+            .elapsed = 0,
+            .duration = self.turn_duration,
+        };
+        return true;
     }
 
-    pub fn update(self: *Animator, dt: f32, cube: *Cube) ?Move {
-        if (self.active == null) self.startNext();
+    pub fn update(self: *PlayerAnimator, dt: f32, cube: *Cube) ?Move {
         if (self.active == null) return null;
 
         self.active.?.elapsed += @max(0, dt);
@@ -56,71 +55,111 @@ pub const Animator = struct {
         const move = self.active.?.move;
         cube.applyMove(move);
         self.active = null;
+        self.startPending();
         return move;
     }
 
-    pub fn visualTurn(self: Animator) ?VisualTurn {
+    pub fn visualTurn(self: PlayerAnimator) ?VisualTurn {
         const active = self.active orelse return null;
-        const progress = if (active.duration <= 0)
-            1
-        else
-            std.math.clamp(active.elapsed / active.duration, 0, 1);
-        return visualTurnForProgress(active.move, progress);
+        return visualTurnForProgress(active.move, active.progress());
     }
 
-    pub fn activeMove(self: Animator) ?Move {
+    pub fn activeMove(self: PlayerAnimator) ?Move {
         if (self.active) |active| return active.move;
         return null;
     }
 
-    pub fn queuedCount(self: Animator) usize {
-        return self.len;
+    pub fn isIdle(self: PlayerAnimator) bool {
+        return self.active == null and self.pending == null;
     }
 
-    pub fn isIdle(self: Animator) bool {
-        return self.active == null and self.len == 0;
+    pub fn clear(self: *PlayerAnimator) void {
+        self.active = null;
+        self.pending = null;
     }
 
-    pub fn clear(self: *Animator) void {
-        self.head = 0;
-        self.len = 0;
+    fn startPending(self: *PlayerAnimator) void {
+        const pending = self.pending orelse return;
+        self.pending = null;
+        _ = self.tryStart(pending);
+    }
+};
+
+pub const ScrambleAnimator = struct {
+    scramble: ?Scramble = null,
+    index: usize = 0,
+    active: ?ActiveTurn = null,
+    turn_duration: f32 = default_scramble_turn_duration,
+
+    pub fn start(self: *ScrambleAnimator, scramble: Scramble) void {
+        self.scramble = scramble;
+        self.index = 0;
         self.active = null;
     }
 
-    fn enqueueWithDuration(self: *Animator, move: Move, duration: f32) bool {
-        if (self.len == self.queue.len) return false;
-        const index = (self.head + self.len) % self.queue.len;
-        self.queue[index] = .{
-            .move = move,
-            .duration = duration,
-        };
-        self.len += 1;
-        return true;
+    pub fn update(self: *ScrambleAnimator, dt: f32, cube: *Cube) ?Move {
+        self.startNextIfIdle();
+        if (self.active == null) return null;
+
+        self.active.?.elapsed += @max(0, dt);
+        if (self.active.?.elapsed < self.active.?.duration) return null;
+
+        const move = self.active.?.move;
+        cube.applyMove(move);
+        self.active = null;
+        if (self.index == cube_mod.scramble_length) {
+            self.scramble = null;
+        }
+        return move;
     }
 
-    fn startNext(self: *Animator) void {
-        if (self.len == 0) return;
+    pub fn visualTurn(self: ScrambleAnimator) ?VisualTurn {
+        const active = self.active orelse return null;
+        return visualTurnForProgress(active.move, active.progress());
+    }
 
-        const queued = self.queue[self.head];
-        self.head = (self.head + 1) % self.queue.len;
-        self.len -= 1;
+    pub fn activeMove(self: ScrambleAnimator) ?Move {
+        if (self.active) |active| return active.move;
+        return null;
+    }
+
+    pub fn isIdle(self: ScrambleAnimator) bool {
+        return self.scramble == null and self.active == null;
+    }
+
+    pub fn isRunning(self: ScrambleAnimator) bool {
+        return !self.isIdle();
+    }
+
+    pub fn clear(self: *ScrambleAnimator) void {
+        self.scramble = null;
+        self.index = 0;
+        self.active = null;
+    }
+
+    fn startNextIfIdle(self: *ScrambleAnimator) void {
+        if (self.active != null) return;
+        const scramble = self.scramble orelse return;
+        if (self.index >= scramble.moves.len) {
+            self.scramble = null;
+            return;
+        }
+
         self.active = .{
-            .move = queued.move,
+            .move = scramble.moves[self.index],
             .elapsed = 0,
-            .duration = queued.duration,
+            .duration = self.turn_duration,
         };
+        self.index += 1;
     }
 };
 
 pub fn visualTurnForProgress(move: Move, progress: f32) VisualTurn {
     const clamped = clampProgress(progress);
     const spring = magneticProgress(clamped);
-    const lift = bellProgress(clamped);
     return .{
         .face = cube_mod.moveFace(move),
         .angle_degrees = targetAngle(move) * spring,
-        .layer_lift = 0.055 * lift,
-        .neighbor_give_degrees = 2.2 * lift * (1.0 - 0.18 * clamped),
     };
 }
 
@@ -132,11 +171,6 @@ fn magneticProgress(progress: f32) f32 {
     const c3 = tension + 1.0;
     const t = progress - 1.0;
     return 1.0 + c3 * t * t * t + tension * t * t;
-}
-
-fn bellProgress(progress: f32) f32 {
-    if (progress <= 0 or progress >= 1) return 0;
-    return @max(0, @sin(std.math.pi * progress));
 }
 
 fn clampProgress(progress: f32) f32 {

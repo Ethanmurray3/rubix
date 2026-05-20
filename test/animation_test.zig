@@ -3,23 +3,20 @@ const rubix = @import("rubix");
 
 const animation = rubix.animation;
 const cube_mod = rubix.cube;
-const Animator = animation.Animator;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
 const Move = cube_mod.Move;
+const PlayerAnimator = animation.PlayerAnimator;
+const ScrambleAnimator = animation.ScrambleAnimator;
 
 test "visual turn starts at zero and finishes exactly on target" {
     const start = animation.visualTurnForProgress(.R, 0);
     try std.testing.expectEqual(Face.right, start.face);
     try std.testing.expectEqual(@as(f32, -0.0), start.angle_degrees);
-    try std.testing.expectEqual(@as(f32, 0), start.layer_lift);
-    try std.testing.expectEqual(@as(f32, 0), start.neighbor_give_degrees);
 
     const finish = animation.visualTurnForProgress(.R, 1);
     try std.testing.expectEqual(Face.right, finish.face);
     try std.testing.expectEqual(@as(f32, -90), finish.angle_degrees);
-    try std.testing.expectEqual(@as(f32, 0), finish.layer_lift);
-    try std.testing.expectEqual(@as(f32, 0), finish.neighbor_give_degrees);
 
     const double = animation.visualTurnForProgress(.U2, 1);
     try std.testing.expectEqual(@as(f32, -180), double.angle_degrees);
@@ -52,83 +49,135 @@ test "visual values stay finite and bounded for invalid progress inputs" {
     for (cases) |progress| {
         const visual = animation.visualTurnForProgress(.F, progress);
         try std.testing.expect(std.math.isFinite(visual.angle_degrees));
-        try std.testing.expect(std.math.isFinite(visual.layer_lift));
-        try std.testing.expect(std.math.isFinite(visual.neighbor_give_degrees));
         try std.testing.expect(@abs(visual.angle_degrees) <= 94);
-        try std.testing.expect(visual.layer_lift >= 0);
-        try std.testing.expect(visual.layer_lift <= 0.055);
-        try std.testing.expect(visual.neighbor_give_degrees >= 0);
-        try std.testing.expect(visual.neighbor_give_degrees <= 2.2);
     }
 }
 
-test "animator commits active move once after visual turn finishes" {
-    var cube = Cube.solved();
-    const solved_bits = cube.bits;
-    var animator = Animator{};
+test "player animator starts one move immediately and buffers latest input while active" {
+    var animator = PlayerAnimator{ .turn_duration = 0.1 };
 
-    try std.testing.expect(animator.enqueue(.R));
-    try std.testing.expectEqual(@as(?Move, null), animator.update(0.05, &cube));
-    try std.testing.expectEqual(solved_bits, cube.bits);
+    try std.testing.expect(animator.isIdle());
+    animator.submit(.R);
     try std.testing.expectEqual(@as(?Move, .R), animator.activeMove());
+    try std.testing.expect(!animator.isIdle());
 
-    try std.testing.expectEqual(@as(?Move, .R), animator.update(animation.default_user_turn_duration, &cube));
-    const turned_bits = cube.bits;
-    try std.testing.expect(turned_bits != solved_bits);
-    try std.testing.expectEqual(@as(?Move, null), animator.activeMove());
-
-    try std.testing.expectEqual(@as(?Move, null), animator.update(animation.default_user_turn_duration, &cube));
-    try std.testing.expectEqual(turned_bits, cube.bits);
+    animator.submit(.U);
+    animator.submit(.F);
+    try std.testing.expectEqual(@as(?Move, .R), animator.activeMove());
 }
 
-test "animator preserves move order" {
-    var animator: Animator = .{ .user_turn_duration = 0.1 };
-    var cube = Cube.solved();
-
-    try std.testing.expect(animator.enqueue(.R));
-    try std.testing.expect(animator.enqueue(.U));
-
-    try std.testing.expectEqual(@as(?Move, null), animator.update(0.05, &cube));
-    try std.testing.expectEqual(@as(?Move, .R), animator.activeMove());
-    try std.testing.expectEqual(@as(?Move, .R), animator.update(0.05, &cube));
-
-    try std.testing.expectEqual(@as(?Move, null), animator.update(0, &cube));
-    try std.testing.expectEqual(@as(?Move, .U), animator.activeMove());
-    try std.testing.expectEqual(@as(?Move, .U), animator.update(0.1, &cube));
-}
-
-test "animator commits moves only after duration completes" {
-    var animator: Animator = .{ .user_turn_duration = 0.1 };
+test "player animator commits active move then immediately starts pending move" {
     var cube = Cube.solved();
     const solved_bits = cube.bits;
+    var animator = PlayerAnimator{ .turn_duration = 0.1 };
 
-    try std.testing.expect(animator.enqueue(.R));
+    animator.submit(.R);
+    animator.submit(.U);
     try std.testing.expectEqual(@as(?Move, null), animator.update(0.099, &cube));
     try std.testing.expectEqual(solved_bits, cube.bits);
 
     try std.testing.expectEqual(@as(?Move, .R), animator.update(0.001, &cube));
-    try std.testing.expect(cube.bits != solved_bits);
+    const after_r = cube.bits;
+    try std.testing.expect(after_r != solved_bits);
+    try std.testing.expectEqual(@as(?Move, .U), animator.activeMove());
+
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.099, &cube));
+    try std.testing.expectEqual(after_r, cube.bits);
+
+    try std.testing.expectEqual(@as(?Move, .U), animator.update(0.001, &cube));
+    try std.testing.expect(cube.bits != after_r);
+    try std.testing.expect(animator.isIdle());
 }
 
-test "active animation reaches final target angle at completion progress" {
-    const visual = animation.visualTurnForProgress(.R, 1.0);
-
-    try std.testing.expectEqual(.right, visual.face);
-    try std.testing.expectApproxEqAbs(@as(f32, -90), visual.angle_degrees, 0.001);
-    try std.testing.expectApproxEqAbs(@as(f32, 0), visual.layer_lift, 0.001);
-}
-
-test "animator clear leaves no active move and no queued moves" {
-    var animator: Animator = .{};
+test "player animator keeps latest pending move" {
     var cube = Cube.solved();
+    var expected = Cube.solved();
+    var animator = PlayerAnimator{ .turn_duration = 0.1 };
 
-    try std.testing.expect(animator.enqueue(.R));
-    try std.testing.expect(animator.enqueue(.U));
-    _ = animator.update(0.01, &cube);
+    animator.submit(.R);
+    animator.submit(.U);
+    animator.submit(.F);
 
+    try std.testing.expectEqual(@as(?Move, .R), animator.update(0.1, &cube));
+    try std.testing.expectEqual(@as(?Move, .F), animator.activeMove());
+
+    try std.testing.expectEqual(@as(?Move, .F), animator.update(0.1, &cube));
+    expected.applyMove(.R);
+    expected.applyMove(.F);
+    try std.testing.expectEqual(expected.bits, cube.bits);
+}
+
+test "player animator visual turn clears after finishing or clearing" {
+    var cube = Cube.solved();
+    var animator = PlayerAnimator{ .turn_duration = 0.1 };
+
+    animator.submit(.U);
+    try std.testing.expect(animator.visualTurn() != null);
+    _ = animator.update(0.1, &cube);
+    try std.testing.expectEqual(@as(?animation.VisualTurn, null), animator.visualTurn());
+
+    animator.submit(.F);
+    animator.submit(.R);
+    animator.clear();
+    try std.testing.expectEqual(@as(?Move, null), animator.activeMove());
+    try std.testing.expect(animator.isIdle());
+    try std.testing.expectEqual(@as(?animation.VisualTurn, null), animator.visualTurn());
+}
+
+test "scramble animator applies moves in order at configured interval" {
+    var cube = Cube.solved();
+    const solved_bits = cube.bits;
+    var animator = ScrambleAnimator{ .turn_duration = 0.1 };
+    var moves = [_]Move{.R} ** cube_mod.scramble_length;
+    moves[1] = .U;
+    const scramble = cube_mod.Scramble{ .moves = moves };
+
+    animator.start(scramble);
+    try std.testing.expect(!animator.isIdle());
+
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.099, &cube));
+    try std.testing.expectEqual(solved_bits, cube.bits);
+    try std.testing.expectEqual(@as(?Move, .R), animator.update(0.001, &cube));
+    const after_first = cube.bits;
+    try std.testing.expect(after_first != solved_bits);
+
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0, &cube));
+    try std.testing.expectEqual(@as(?Move, .U), animator.activeMove());
+    try std.testing.expectEqual(@as(?Move, .U), animator.update(0.1, &cube));
+    try std.testing.expect(cube.bits != after_first);
+}
+
+test "scramble animator reports idle after all moves finish" {
+    var cube = Cube.solved();
+    var animator = ScrambleAnimator{ .turn_duration = 0.01 };
+    const scramble = cube_mod.Scramble{
+        .moves = [_]Move{.R} ** cube_mod.scramble_length,
+    };
+
+    animator.start(scramble);
+    for (0..cube_mod.scramble_length) |_| {
+        try std.testing.expect(animator.update(0.01, &cube) != null);
+    }
+
+    try std.testing.expect(animator.isIdle());
+    try std.testing.expectEqual(@as(?Move, null), animator.activeMove());
+    try std.testing.expectEqual(@as(?animation.VisualTurn, null), animator.visualTurn());
+}
+
+test "scramble animator clear stops playback without committing extra moves" {
+    var cube = Cube.solved();
+    const solved_bits = cube.bits;
+    var animator = ScrambleAnimator{ .turn_duration = 0.1 };
+    const scramble = cube_mod.Scramble{
+        .moves = [_]Move{.R} ** cube_mod.scramble_length,
+    };
+
+    animator.start(scramble);
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.05, &cube));
     animator.clear();
 
-    try std.testing.expectEqual(@as(?Move, null), animator.activeMove());
-    try std.testing.expectEqual(@as(usize, 0), animator.queuedCount());
     try std.testing.expect(animator.isIdle());
+    try std.testing.expectEqual(solved_bits, cube.bits);
+    try std.testing.expectEqual(@as(?Move, null), animator.update(0.1, &cube));
+    try std.testing.expectEqual(solved_bits, cube.bits);
 }

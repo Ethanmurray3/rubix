@@ -4,7 +4,8 @@ const animation = @import("animation.zig");
 const cube_mod = @import("cube.zig");
 const render = @import("render.zig");
 
-const Animator = animation.Animator;
+const PlayerAnimator = animation.PlayerAnimator;
+const ScrambleAnimator = animation.ScrambleAnimator;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
 const Move = cube_mod.Move;
@@ -81,7 +82,8 @@ pub fn main(init: std.process.Init) !void {
 
     var orbit: CameraOrbit = .{};
     var orientation: Orientation = .{};
-    var animator: Animator = .{};
+    var player_animator: PlayerAnimator = .{};
+    var scramble_animator: ScrambleAnimator = .{};
     var last: LastAction = .{};
     var scramble_buffer: [128]u8 = undefined;
 
@@ -100,20 +102,12 @@ pub fn main(init: std.process.Init) !void {
             };
         }
 
-        if (readMoveInput(controls)) |move| {
-            if (animator.enqueue(move)) {
-                last = .{
-                    .status = moveNameZ(move),
-                    .scramble = "",
-                };
-            }
-        }
-
         if (rl.isKeyPressed(.tab)) {
             cube = Cube.solved();
-            animator.clear();
+            player_animator.clear();
+            scramble_animator.clear();
             const scramble = Cube.scramble(prng.random());
-            animator.enqueueScramble(scramble);
+            scramble_animator.start(scramble);
             const notation = scrambleNotationZ(&scramble_buffer, scramble);
             rl.setClipboardText(notation);
             last = .{
@@ -125,24 +119,44 @@ pub fn main(init: std.process.Init) !void {
         if (rl.isKeyPressed(.space)) {
             cube = Cube.solved();
             orientation = .{};
-            animator.clear();
+            player_animator.clear();
+            scramble_animator.clear();
             last = .{
                 .status = "Solved",
                 .scramble = "",
             };
         }
 
-        if (animator.update(frame_time, &cube)) |move| {
-            last.status = moveNameZ(move);
-        }
+        const visual_turn: ?animation.VisualTurn = if (scramble_animator.isRunning()) scramble: {
+            if (scramble_animator.update(frame_time, &cube)) |move| {
+                last.status = moveNameZ(move);
+            } else if (scramble_animator.activeMove()) |move| {
+                last.status = moveNameZ(move);
+            }
+            break :scramble scramble_animator.visualTurn();
+        } else player: {
+            if (readMoveInput(controls)) |move| {
+                player_animator.submit(move);
+                last = .{
+                    .status = moveNameZ(move),
+                    .scramble = "",
+                };
+            }
 
-        if (animator.activeMove()) |move| {
-            last.status = moveNameZ(move);
-        } else if (cube.isSolved() and animator.isIdle()) {
+            if (player_animator.update(frame_time, &cube)) |move| {
+                last.status = moveNameZ(move);
+            } else if (player_animator.activeMove()) |move| {
+                last.status = moveNameZ(move);
+            }
+
+            break :player player_animator.visualTurn();
+        };
+
+        if (cube.isSolved() and player_animator.isIdle() and scramble_animator.isIdle()) {
             last.status = "Solved";
         }
 
-        draw(cube, camera, orientation, last, controls, animator.visualTurn());
+        draw(cube, camera, orientation, last, controls, visual_turn);
     }
 }
 

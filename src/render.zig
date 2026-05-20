@@ -97,13 +97,7 @@ fn drawCubie(
 ) void {
     if (visual_turn) |turn| {
         if (cubieInMovingLayer(coord, turn.face)) {
-            drawTransformedCubie(cube, orientation, coord, turn.face, turn.angle_degrees, turn.layer_lift);
-            return;
-        }
-
-        if (cubieInNeighborLayer(coord, turn.face) and turn.neighbor_give_degrees > 0) {
-            const give_angle = if (turn.angle_degrees < 0) -turn.neighbor_give_degrees else turn.neighbor_give_degrees;
-            drawTransformedCubie(cube, orientation, coord, turn.face, give_angle, 0);
+            drawTransformedCubie(cube, orientation, coord, turn.face, turn.angle_degrees);
             return;
         }
     }
@@ -136,7 +130,6 @@ fn drawTransformedCubie(
     coord: FaceletCoord,
     turn_face: Face,
     angle_degrees: f32,
-    layer_lift: f32,
 ) void {
     const normal = faceNormal(turn_face);
 
@@ -144,11 +137,6 @@ fn drawTransformedCubie(
     defer rl.gl.rlPopMatrix();
 
     applyOrientation(orientation);
-    rl.gl.rlTranslatef(
-        normal.x * layer_lift,
-        normal.y * layer_lift,
-        normal.z * layer_lift,
-    );
     rl.gl.rlRotatef(angle_degrees, normal.x, normal.y, normal.z);
 
     drawCubieBody(cubieCenter(coord), vec3(cubie_size, cubie_size, cubie_size));
@@ -230,14 +218,6 @@ fn coordOnFace(coord: FaceletCoord, face: Face) bool {
 
 fn cubieInMovingLayer(coord: FaceletCoord, face: Face) bool {
     return coordOnFace(coord, face);
-}
-
-fn cubieInNeighborLayer(coord: FaceletCoord, face: Face) bool {
-    return switch (face) {
-        .up, .down => coord.y == 0,
-        .front, .back => coord.z == 0,
-        .left, .right => coord.x == 0,
-    };
 }
 
 fn faceNormal(face: Face) rl.Vector3 {
