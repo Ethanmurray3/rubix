@@ -1,6 +1,8 @@
 # Rubix
 
-Rubix is a Zig and raylib Rubik's Cube visualizer. It uses a compact cubie model for cube state, animates face turns, and renders the cube in 3D with controls that follow the current camera view.
+Rubix is becoming a polished CFOP trainer for learning Cross, F2L, OLL, and PLL. The current repo contains a portable cube engine, notation helpers, and a Zig/raylib desktop prototype that animates a 3D cube and provides a useful correctness harness while the product moves toward a web-first trainer experience.
+
+See [PLANS.md](PLANS.md) for the product roadmap, MVP scope, content policy, and future architecture direction.
 
 ## Requirements
 
@@ -22,6 +24,12 @@ zig fmt build.zig src/*.zig test/*.zig
 zig fmt --check build.zig src/*.zig test/*.zig
 ```
 
+## Product Direction
+
+Rubix should become a shipped learning product, not a debug visualizer. The first product milestone is a 2-look OLL/PLL trainer with reference views, setup states, algorithm playback, recognition quizzes, timers, and basic progress tracking. Later milestones add full OLL/PLL, F2L and Cross lessons, gamified practice, real-cube reference flows, bot races, web delivery, and eventually iOS.
+
+J Perm's CFOP and algorithm pages are the main reference for curriculum organization and algorithm selection, with attribution. Rubix should maintain its own curated algorithm data and should not copy site prose, images, or UI wholesale without a separate licensing decision.
+
 ## Controls
 
 | Input | Action |
@@ -42,15 +50,16 @@ zig fmt --check build.zig src/*.zig test/*.zig
 
 ## Architecture
 
-- `src/cube.zig` owns the packed `u100` cube state, cubie encoding, move application, and validation. `Cube.bits` is intentionally public as a low-level value-type API for tests, fixtures, and future tooling.
+- `src/cube.zig` owns the packed `u100` cube state, cubie encoding, move application, and validation. Product-facing trainer code should prefer clear cube/case APIs over direct packed-bit access.
 - `src/facelet.zig` owns face/color types, facelet coordinate mapping, and cube-to-sticker color projection. `faceletIndex` is a fast assert-style helper for internal coordinates; `faceletIndexChecked` is available for checked input paths.
 - `src/move.zig` owns move enums, move axes, inverse moves, and standard move names.
 - `src/scramble.zig` owns scramble generation and scramble shape.
 - `src/notation.zig` parses and formats move notation such as `R U R' U'`.
 - `src/animation.zig` owns queued turn animation and commits moves only when animations finish.
-- `src/render.zig` owns raylib cube drawing plus `Axis` and `Orientation` rendering data.
-- `src/camera.zig` owns orbit camera math and view-axis helpers.
-- `src/controls.zig` maps keyboard input and held-cube orientation into cube moves.
+- Future `algorithm`, `cfop`, `cfop_cases`, `cfop_recognition`, `trainer`, `progress`, and `cfop_solver` modules should remain renderer-free so web, desktop, and future iOS frontends share the same product logic.
+- `src/render.zig` owns raylib cube drawing plus `Axis` and `Orientation` rendering data for the current desktop prototype.
+- `src/camera.zig` owns orbit camera math and view-axis helpers for the current desktop prototype.
+- `src/controls.zig` maps keyboard input and held-cube orientation into cube moves for the current desktop prototype.
 - `src/ui.zig` owns status strings, face names, and scramble notation formatting.
 - `src/gui.zig` owns raylib window setup, frame drawing, and overlay drawing.
 - `src/app.zig` owns the GUI app loop and state transitions.
@@ -61,13 +70,13 @@ zig fmt --check build.zig src/*.zig test/*.zig
 ## Audit Decisions
 
 - Move tables stay hand-coded for now. The current risk is mitigated by cube validation, permutation parity checks, and known facelet fixtures for all 18 face turns. A data-driven move-table generator is deferred until solver/search work makes that abstraction earn its keep.
-- `Cube.bits` remains public on purpose. Rubix is still a systems-learning project, and the packed value is useful for fixture construction, validation tests, and future CLI/debug tools.
+- `Cube.bits` remains public for now because it is useful for fixture construction, validation tests, and tooling. Product code should not leak packed-bit details into trainer UI or progress APIs.
 - Facelet indexing now has both forms: `faceletIndex` for trusted internal coordinates and `faceletIndexChecked` for callers that need an error instead of an assertion.
 
 ## Roadmap
 
-- Keep hardening the cube core with additional known algorithm fixtures and invalid raw-state fixtures.
-- Add GUI algorithm playback through the same move queue used by input.
-- Expand CLI output options when concrete workflows need them.
-- Defer data-driven move tables until solver or search work needs generated transition data.
-- Explore solver work later, starting with a smaller 2x2 search project before full 3x3 solving.
+- Add `PLANS.md`-driven CFOP product modules for algorithms, cases, recognition, trainer sessions, progress, and CFOP-style solve plans.
+- Build the first shipped learning loop around 2-look OLL and 2-look PLL.
+- Keep the cube engine and trainer/session logic portable and independent from raylib.
+- Use the current raylib app as a prototype frontend while the product moves toward a web-first trainer.
+- Add web and later iOS frontends once the core trainer API is stable.
