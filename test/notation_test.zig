@@ -47,6 +47,22 @@ test "parseAlgorithm handles extra whitespace and double moves" {
     try std.testing.expectEqualSlices(cube.Move, &.{ .R2, .F, .BPrime, .L, .D2 }, moves);
 }
 
+test "formatAlgorithmInto writes normalized notation" {
+    var buffer: [32]u8 = undefined;
+    const text = try notation.formatAlgorithmInto(&buffer, &.{ .R, .U, .RPrime, .UPrime });
+
+    try std.testing.expectEqualStrings("R U R' U'", text);
+}
+
+test "formatAlgorithmInto supports empty algorithms and rejects undersized buffers" {
+    var empty_buffer: [0]u8 = .{};
+    const empty = try notation.formatAlgorithmInto(&empty_buffer, &.{});
+    try std.testing.expectEqualStrings("", empty);
+
+    var short_buffer: [4]u8 = undefined;
+    try std.testing.expectError(error.OutputTooSmall, notation.formatAlgorithmInto(&short_buffer, &.{ .R, .U, .RPrime }));
+}
+
 test "parseAlgorithmInto parses without allocation" {
     var buffer: [8]cube.Move = undefined;
     const moves = try notation.parseAlgorithmInto("F R U R' U' F'", &buffer);
@@ -59,6 +75,46 @@ test "parseAlgorithmInto rejects empty input and undersized output" {
 
     try std.testing.expectError(error.EmptyAlgorithm, notation.parseAlgorithmInto(" \t\n", &buffer));
     try std.testing.expectError(error.OutputTooSmall, notation.parseAlgorithmInto("R U R'", &buffer));
+}
+
+test "inverseAlgorithmInto reverses order and inverts each move" {
+    const moves = [_]cube.Move{ .R, .U, .RPrime, .UPrime };
+    var inverse_buffer: [moves.len]cube.Move = undefined;
+    const inverse = try notation.inverseAlgorithmInto(&moves, &inverse_buffer);
+
+    try std.testing.expectEqualSlices(cube.Move, &.{ .U, .R, .UPrime, .RPrime }, inverse);
+
+    var state = cube.Cube.solved();
+    state.applyMoves(&moves);
+    state.applyMoves(inverse);
+    try std.testing.expect(state.isSolved());
+}
+
+test "inverseAlgorithmInto supports exact in-place output" {
+    var moves = [_]cube.Move{ .R, .U, .RPrime, .UPrime };
+    const inverse = try notation.inverseAlgorithmInto(&moves, &moves);
+
+    try std.testing.expectEqualSlices(cube.Move, &.{ .U, .R, .UPrime, .RPrime }, inverse);
+    try std.testing.expectEqualSlices(cube.Move, inverse, &moves);
+}
+
+test "inverseAlgorithmInto rejects undersized output" {
+    var buffer: [2]cube.Move = undefined;
+    try std.testing.expectError(error.OutputTooSmall, notation.inverseAlgorithmInto(&.{ .R, .U, .RPrime }, &buffer));
+}
+
+test "parse format and inverse algorithm helpers round trip together" {
+    const moves = try notation.parseAlgorithm(std.testing.allocator, "R2 F B' L D2");
+    defer std.testing.allocator.free(moves);
+
+    var format_buffer: [32]u8 = undefined;
+    const formatted = try notation.formatAlgorithmInto(&format_buffer, moves);
+    try std.testing.expectEqualStrings("R2 F B' L D2", formatted);
+
+    var inverse_buffer: [5]cube.Move = undefined;
+    const inverse = try notation.inverseAlgorithmInto(moves, &inverse_buffer);
+    const inverse_text = try notation.formatAlgorithmInto(&format_buffer, inverse);
+    try std.testing.expectEqualStrings("D2 L' B F' R2", inverse_text);
 }
 
 test "sexy move repeated six times returns solved" {

@@ -10,6 +10,10 @@ pub const ParseError = error{
     OutOfMemory,
 };
 
+pub const FormatError = error{
+    OutputTooSmall,
+};
+
 pub fn parseMove(token: []const u8) ParseError!cube.Move {
     if (token.len == 0) return ParseError.EmptyMove;
     if (token.len > 2) return ParseError.InvalidSuffix;
@@ -86,6 +90,49 @@ pub fn parseAlgorithmInto(input: []const u8, out: []cube.Move) ParseError![]cube
 
 pub fn formatMove(move: cube.Move) []const u8 {
     return cube.moveName(move);
+}
+
+pub fn formatAlgorithmInto(buffer: []u8, moves: []const cube.Move) FormatError![]const u8 {
+    var position: usize = 0;
+    for (moves, 0..) |move, index| {
+        const separator_len: usize = if (index == 0) 0 else 1;
+        const name = formatMove(move);
+        if (position + separator_len + name.len > buffer.len) return FormatError.OutputTooSmall;
+
+        if (separator_len != 0) {
+            buffer[position] = ' ';
+            position += 1;
+        }
+        std.mem.copyForwards(u8, buffer[position .. position + name.len], name);
+        position += name.len;
+    }
+
+    return buffer[0..position];
+}
+
+pub fn inverseAlgorithmInto(moves: []const cube.Move, out: []cube.Move) FormatError![]cube.Move {
+    if (out.len < moves.len) return FormatError.OutputTooSmall;
+
+    if (moves.ptr == out.ptr) {
+        var left: usize = 0;
+        var right = moves.len;
+        while (left < right) {
+            right -= 1;
+
+            const left_move = out[left];
+            out[left] = cube.inverseMove(out[right]);
+            out[right] = cube.inverseMove(left_move);
+
+            left += 1;
+        }
+        return out[0..moves.len];
+    }
+
+    for (moves, 0..) |move, index| {
+        out[moves.len - 1 - index] = cube.inverseMove(move);
+    }
+
+    return out[0..moves.len];
 }
 
 fn countTokens(input: []const u8) usize {
