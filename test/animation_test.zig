@@ -3,9 +3,11 @@ const rubix = @import("rubix");
 
 const animation = rubix.animation;
 const cube_mod = rubix.cube;
+const move_mod = rubix.move;
+const scramble_mod = rubix.scramble;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
-const Move = cube_mod.Move;
+const Move = move_mod.Move;
 const PlayerAnimator = animation.PlayerAnimator;
 const ScrambleAnimator = animation.ScrambleAnimator;
 
@@ -128,9 +130,9 @@ test "scramble animator applies moves in order at configured interval" {
     var cube = Cube.solved();
     const solved_bits = cube.bits;
     var animator = ScrambleAnimator{ .turn_duration = 0.1 };
-    var moves = [_]Move{.R} ** cube_mod.scramble_length;
+    var moves = [_]Move{.R} ** scramble_mod.scramble_length;
     moves[1] = .U;
-    const scramble = cube_mod.Scramble{ .moves = moves };
+    const scramble = scramble_mod.Scramble{ .moves = moves };
 
     animator.start(scramble);
     try std.testing.expect(!animator.isIdle());
@@ -150,12 +152,12 @@ test "scramble animator applies moves in order at configured interval" {
 test "scramble animator reports idle after all moves finish" {
     var cube = Cube.solved();
     var animator = ScrambleAnimator{ .turn_duration = 0.01 };
-    const scramble = cube_mod.Scramble{
-        .moves = [_]Move{.R} ** cube_mod.scramble_length,
+    const scramble = scramble_mod.Scramble{
+        .moves = [_]Move{.R} ** scramble_mod.scramble_length,
     };
 
     animator.start(scramble);
-    for (0..cube_mod.scramble_length) |_| {
+    for (0..scramble_mod.scramble_length) |_| {
         try std.testing.expect(animator.update(0.01, &cube) != null);
     }
 
@@ -168,8 +170,8 @@ test "scramble animator clear stops playback without committing extra moves" {
     var cube = Cube.solved();
     const solved_bits = cube.bits;
     var animator = ScrambleAnimator{ .turn_duration = 0.1 };
-    const scramble = cube_mod.Scramble{
-        .moves = [_]Move{.R} ** cube_mod.scramble_length,
+    const scramble = scramble_mod.Scramble{
+        .moves = [_]Move{.R} ** scramble_mod.scramble_length,
     };
 
     animator.start(scramble);

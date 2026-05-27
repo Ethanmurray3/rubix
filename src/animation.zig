@@ -1,10 +1,12 @@
 const std = @import("std");
 const cube_mod = @import("cube.zig");
+const move_mod = @import("move.zig");
+const scramble_mod = @import("scramble.zig");
 
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
-const Move = cube_mod.Move;
-const Scramble = cube_mod.Scramble;
+const Move = move_mod.Move;
+const Scramble = scramble_mod.Scramble;
 
 pub const default_user_turn_duration: f32 = 0.16;
 pub const default_scramble_turn_duration: f32 = 0.115;
@@ -107,7 +109,7 @@ pub const ScrambleAnimator = struct {
         const move = self.active.?.move;
         cube.applyMove(move);
         self.active = null;
-        if (self.index == cube_mod.scramble_length) {
+        if (self.index == scramble_mod.scramble_length) {
             self.scramble = null;
         }
         return move;

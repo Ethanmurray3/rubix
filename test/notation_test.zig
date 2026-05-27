@@ -1,17 +1,18 @@
 const std = @import("std");
 const rubix = @import("rubix");
 const cube = rubix.cube;
+const move_mod = rubix.move;
 const notation = rubix.notation;
 
 test "parseMove accepts standard quarter prime and double turns" {
-    try std.testing.expectEqual(cube.Move.R, try notation.parseMove("R"));
-    try std.testing.expectEqual(cube.Move.RPrime, try notation.parseMove("R'"));
-    try std.testing.expectEqual(cube.Move.R2, try notation.parseMove("R2"));
-    try std.testing.expectEqual(cube.Move.U, try notation.parseMove("U"));
-    try std.testing.expectEqual(cube.Move.DPrime, try notation.parseMove("D'"));
-    try std.testing.expectEqual(cube.Move.F2, try notation.parseMove("F2"));
-    try std.testing.expectEqual(cube.Move.BPrime, try notation.parseMove("B'"));
-    try std.testing.expectEqual(cube.Move.L2, try notation.parseMove("L2"));
+    try std.testing.expectEqual(move_mod.Move.R, try notation.parseMove("R"));
+    try std.testing.expectEqual(move_mod.Move.RPrime, try notation.parseMove("R'"));
+    try std.testing.expectEqual(move_mod.Move.R2, try notation.parseMove("R2"));
+    try std.testing.expectEqual(move_mod.Move.U, try notation.parseMove("U"));
+    try std.testing.expectEqual(move_mod.Move.DPrime, try notation.parseMove("D'"));
+    try std.testing.expectEqual(move_mod.Move.F2, try notation.parseMove("F2"));
+    try std.testing.expectEqual(move_mod.Move.BPrime, try notation.parseMove("B'"));
+    try std.testing.expectEqual(move_mod.Move.L2, try notation.parseMove("L2"));
 }
 
 test "parseMove rejects empty invalid face and invalid suffix tokens" {
@@ -22,10 +23,10 @@ test "parseMove rejects empty invalid face and invalid suffix tokens" {
 }
 
 test "parseMove round trips move names" {
-    inline for (std.meta.fields(cube.Move)) |field| {
-        const move: cube.Move = @enumFromInt(field.value);
-        try std.testing.expectEqual(move, try notation.parseMove(cube.moveName(move)));
-        try std.testing.expectEqualStrings(cube.moveName(move), notation.formatMove(move));
+    inline for (std.meta.fields(move_mod.Move)) |field| {
+        const move: move_mod.Move = @enumFromInt(field.value);
+        try std.testing.expectEqual(move, try notation.parseMove(move_mod.moveName(move)));
+        try std.testing.expectEqualStrings(move_mod.moveName(move), notation.formatMove(move));
     }
 }
 
@@ -33,7 +34,7 @@ test "parseAlgorithm allocates a move slice from notation" {
     const moves = try notation.parseAlgorithm(std.testing.allocator, "R U R' U'");
     defer std.testing.allocator.free(moves);
 
-    try std.testing.expectEqualSlices(cube.Move, &.{ .R, .U, .RPrime, .UPrime }, moves);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .R, .U, .RPrime, .UPrime }, moves);
 
     var state = cube.Cube.solved();
     state.applyMoves(moves);
@@ -44,7 +45,7 @@ test "parseAlgorithm handles extra whitespace and double moves" {
     const moves = try notation.parseAlgorithm(std.testing.allocator, "  R2\tF\nB'   L D2  ");
     defer std.testing.allocator.free(moves);
 
-    try std.testing.expectEqualSlices(cube.Move, &.{ .R2, .F, .BPrime, .L, .D2 }, moves);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .R2, .F, .BPrime, .L, .D2 }, moves);
 }
 
 test "formatAlgorithmInto writes normalized notation" {
@@ -64,25 +65,25 @@ test "formatAlgorithmInto supports empty algorithms and rejects undersized buffe
 }
 
 test "parseAlgorithmInto parses without allocation" {
-    var buffer: [8]cube.Move = undefined;
+    var buffer: [8]move_mod.Move = undefined;
     const moves = try notation.parseAlgorithmInto("F R U R' U' F'", &buffer);
 
-    try std.testing.expectEqualSlices(cube.Move, &.{ .F, .R, .U, .RPrime, .UPrime, .FPrime }, moves);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .F, .R, .U, .RPrime, .UPrime, .FPrime }, moves);
 }
 
 test "parseAlgorithmInto rejects empty input and undersized output" {
-    var buffer: [2]cube.Move = undefined;
+    var buffer: [2]move_mod.Move = undefined;
 
     try std.testing.expectError(error.EmptyAlgorithm, notation.parseAlgorithmInto(" \t\n", &buffer));
     try std.testing.expectError(error.OutputTooSmall, notation.parseAlgorithmInto("R U R'", &buffer));
 }
 
 test "inverseAlgorithmInto reverses order and inverts each move" {
-    const moves = [_]cube.Move{ .R, .U, .RPrime, .UPrime };
-    var inverse_buffer: [moves.len]cube.Move = undefined;
+    const moves = [_]move_mod.Move{ .R, .U, .RPrime, .UPrime };
+    var inverse_buffer: [moves.len]move_mod.Move = undefined;
     const inverse = try notation.inverseAlgorithmInto(&moves, &inverse_buffer);
 
-    try std.testing.expectEqualSlices(cube.Move, &.{ .U, .R, .UPrime, .RPrime }, inverse);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .U, .R, .UPrime, .RPrime }, inverse);
 
     var state = cube.Cube.solved();
     state.applyMoves(&moves);
@@ -91,15 +92,15 @@ test "inverseAlgorithmInto reverses order and inverts each move" {
 }
 
 test "inverseAlgorithmInto supports exact in-place output" {
-    var moves = [_]cube.Move{ .R, .U, .RPrime, .UPrime };
+    var moves = [_]move_mod.Move{ .R, .U, .RPrime, .UPrime };
     const inverse = try notation.inverseAlgorithmInto(&moves, &moves);
 
-    try std.testing.expectEqualSlices(cube.Move, &.{ .U, .R, .UPrime, .RPrime }, inverse);
-    try std.testing.expectEqualSlices(cube.Move, inverse, &moves);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .U, .R, .UPrime, .RPrime }, inverse);
+    try std.testing.expectEqualSlices(move_mod.Move, inverse, &moves);
 }
 
 test "inverseAlgorithmInto rejects undersized output" {
-    var buffer: [2]cube.Move = undefined;
+    var buffer: [2]move_mod.Move = undefined;
     try std.testing.expectError(error.OutputTooSmall, notation.inverseAlgorithmInto(&.{ .R, .U, .RPrime }, &buffer));
 }
 
@@ -111,7 +112,7 @@ test "parse format and inverse algorithm helpers round trip together" {
     const formatted = try notation.formatAlgorithmInto(&format_buffer, moves);
     try std.testing.expectEqualStrings("R2 F B' L D2", formatted);
 
-    var inverse_buffer: [5]cube.Move = undefined;
+    var inverse_buffer: [5]move_mod.Move = undefined;
     const inverse = try notation.inverseAlgorithmInto(moves, &inverse_buffer);
     const inverse_text = try notation.formatAlgorithmInto(&format_buffer, inverse);
     try std.testing.expectEqualStrings("D2 L' B F' R2", inverse_text);

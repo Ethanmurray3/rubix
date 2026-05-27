@@ -53,12 +53,6 @@ pub const Edge = enum(u4) {
 
 pub const CubeBits = u100;
 
-pub const Move = move_mod.Move;
-pub const MoveAxis = move_mod.MoveAxis;
-pub const moveAxis = move_mod.moveAxis;
-pub const inverseMove = move_mod.inverseMove;
-pub const moveName = move_mod.moveName;
-
 pub const ValidationError = error{
     DuplicateCorner,
     MissingCorner,
@@ -69,12 +63,6 @@ pub const ValidationError = error{
     MissingEdge,
     InvalidEdgeFlip,
     MismatchedPermutationParity,
-};
-
-pub const scramble_length = 20;
-
-pub const Scramble = struct {
-    moves: [scramble_length]Move,
 };
 
 const chunk_size = 5;
@@ -207,31 +195,13 @@ pub const Cube = struct {
         }
     }
 
-    pub fn scramble(random: std.Random) Scramble {
-        var result: Scramble = undefined;
-        var previous: ?Move = null;
-
-        for (&result.moves) |*move| {
-            while (true) {
-                const candidate = random.enumValue(Move);
-                if (previous == null or moveAxis(candidate) != moveAxis(previous.?)) {
-                    move.* = candidate;
-                    break;
-                }
-            }
-            previous = move.*;
-        }
-
-        return result;
-    }
-
-    pub fn applyMoves(self: *Cube, moves: []const Move) void {
+    pub fn applyMoves(self: *Cube, moves: []const move_mod.Move) void {
         for (moves) |move| {
             self.applyMove(move);
         }
     }
 
-    pub fn applyMove(self: *Cube, move: Move) void {
+    pub fn applyMove(self: *Cube, move: move_mod.Move) void {
         switch (move) {
             .U => self.turnU(),
             .UPrime => self.turnUPrime(),
@@ -567,7 +537,7 @@ fn setChunk(bits: CubeBits, position: Position, chunk: u5) CubeBits {
     return (bits & clear_mask) | (@as(CubeBits, chunk) << shift);
 }
 
-pub fn moveFace(move: Move) Face {
+pub fn moveFace(move: move_mod.Move) Face {
     return switch (move) {
         .U, .UPrime, .U2 => .up,
         .D, .DPrime, .D2 => .down,

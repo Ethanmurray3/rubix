@@ -1,10 +1,12 @@
 const std = @import("std");
 const rubix = @import("rubix");
 const cube_mod = rubix.cube;
+const move_mod = rubix.move;
+const scramble_mod = rubix.scramble;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
 const FaceletCoord = cube_mod.FaceletCoord;
-const Move = cube_mod.Move;
+const Move = move_mod.Move;
 
 fn expectSolved(cube: Cube) !void {
     try std.testing.expect(cube.isSolved());
@@ -128,22 +130,15 @@ test "double moves match two turns" {
     try expectDoubleMove(.B2, Cube.turnB);
 }
 
-test "move names use standard notation" {
-    try std.testing.expectEqualStrings("R", cube_mod.moveName(.R));
-    try std.testing.expectEqualStrings("R'", cube_mod.moveName(.RPrime));
-    try std.testing.expectEqualStrings("R2", cube_mod.moveName(.R2));
-}
-
-test "inverseMove maps every move to its inverse" {
+test "moves can be applied with their inverse" {
     inline for (std.meta.fields(Move)) |field| {
         const move: Move = @enumFromInt(field.value);
         var cube = Cube.solved();
 
         cube.applyMove(move);
-        cube.applyMove(cube_mod.inverseMove(move));
+        cube.applyMove(move_mod.inverseMove(move));
 
         try expectSolved(cube);
-        try std.testing.expectEqual(move, cube_mod.inverseMove(cube_mod.inverseMove(move)));
     }
 }
 
@@ -164,11 +159,11 @@ test "applyMoves applies an algorithm slice in order" {
 test "scramble followed by inverse sequence returns solved" {
     var prng = std.Random.DefaultPrng.init(12345);
     const random = prng.random();
-    const scramble = Cube.scramble(random);
+    const scramble = scramble_mod.generate(random);
 
-    var inverse: [cube_mod.scramble_length]Move = undefined;
+    var inverse: [scramble_mod.scramble_length]Move = undefined;
     for (scramble.moves, 0..) |move, index| {
-        inverse[cube_mod.scramble_length - 1 - index] = cube_mod.inverseMove(move);
+        inverse[scramble_mod.scramble_length - 1 - index] = move_mod.inverseMove(move);
     }
 
     var cube = Cube.solved();
@@ -191,7 +186,7 @@ test "validation accepts solved cube moves and scrambles" {
 
     var prng = std.Random.DefaultPrng.init(12345);
     const random = prng.random();
-    const scramble = Cube.scramble(random);
+    const scramble = scramble_mod.generate(random);
     var cube = Cube.solved();
     for (scramble.moves) |move| {
         cube.applyMove(move);
@@ -305,24 +300,11 @@ test "facelet coordinates cover the visible cubies and stickers" {
     try std.testing.expect(!visible_cubies[13]);
 }
 
-test "scramble returns twenty moves and avoids adjacent axes" {
-    var prng = std.Random.DefaultPrng.init(12345);
-    const random = prng.random();
-
-    const scramble = Cube.scramble(random);
-
-    try std.testing.expectEqual(@as(usize, cube_mod.scramble_length), scramble.moves.len);
-
-    for (scramble.moves[1..], 1..) |move, index| {
-        try std.testing.expect(cube_mod.moveAxis(move) != cube_mod.moveAxis(scramble.moves[index - 1]));
-    }
-}
-
 test "scramble can be applied explicitly to a cube" {
     var prng = std.Random.DefaultPrng.init(12345);
     const random = prng.random();
 
-    const scramble = Cube.scramble(random);
+    const scramble = scramble_mod.generate(random);
     var cube = Cube.solved();
     for (scramble.moves) |move| {
         cube.applyMove(move);

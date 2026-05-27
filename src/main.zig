@@ -2,13 +2,15 @@ const std = @import("std");
 const rl = @import("raylib");
 const animation = @import("animation.zig");
 const cube_mod = @import("cube.zig");
+const move_mod = @import("move.zig");
 const render = @import("render.zig");
+const scramble_mod = @import("scramble.zig");
 
 const PlayerAnimator = animation.PlayerAnimator;
 const ScrambleAnimator = animation.ScrambleAnimator;
 const Cube = cube_mod.Cube;
 const Face = cube_mod.Face;
-const Move = cube_mod.Move;
+const Move = move_mod.Move;
 const Axis = render.Axis;
 const Orientation = render.Orientation;
 
@@ -106,7 +108,7 @@ pub fn main(init: std.process.Init) !void {
             cube = Cube.solved();
             player_animator.clear();
             scramble_animator.clear();
-            const scramble = Cube.scramble(prng.random());
+            const scramble = scramble_mod.generate(prng.random());
             scramble_animator.start(scramble);
             const notation = scrambleNotationZ(&scramble_buffer, scramble);
             rl.setClipboardText(notation);
@@ -443,7 +445,7 @@ fn faceName(face: Face) []const u8 {
     };
 }
 
-fn scrambleNotationZ(buffer: *[128]u8, scramble: cube_mod.Scramble) [:0]const u8 {
+fn scrambleNotationZ(buffer: *[128]u8, scramble: scramble_mod.Scramble) [:0]const u8 {
     var position: usize = 0;
 
     for (scramble.moves, 0..) |move, index| {
@@ -452,7 +454,7 @@ fn scrambleNotationZ(buffer: *[128]u8, scramble: cube_mod.Scramble) [:0]const u8
             position += 1;
         }
 
-        const name = cube_mod.moveName(move);
+        const name = move_mod.moveName(move);
         std.mem.copyForwards(u8, buffer[position .. position + name.len], name);
         position += name.len;
     }
