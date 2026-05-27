@@ -21,6 +21,18 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    const cli_exe = b.addExecutable(.{
+        .name = "rubix-cli",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/cli.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "rubix", .module = mod },
+            },
+        }),
+    });
+
     const raylib_dep = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
@@ -32,6 +44,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
     b.installArtifact(exe);
+    b.installArtifact(cli_exe);
 
     const run_step = b.step("run", "Run the app");
     const run_cmd = b.addRunArtifact(exe);
@@ -41,10 +54,20 @@ pub fn build(b: *std.Build) void {
     }
     run_step.dependOn(&run_cmd.step);
 
+    const cli_step = b.step("cli", "Run the CLI");
+    const cli_cmd = b.addRunArtifact(cli_exe);
+    cli_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        cli_cmd.addArgs(args);
+    }
+    cli_step.dependOn(&cli_cmd.step);
+
     const test_step = b.step("test", "Run tests");
     addRunTest(test_step, b.addTest(.{ .root_module = mod }), b);
     addRunTest(test_step, b.addTest(.{ .root_module = exe.root_module }), b);
+    addRunTest(test_step, b.addTest(.{ .root_module = cli_exe.root_module }), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cube_test.zig"), b);
+    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cli_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/animation_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/facelet_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/move_test.zig"), b);
