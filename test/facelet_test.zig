@@ -1,9 +1,13 @@
 const std = @import("std");
 const rubix = @import("rubix");
 
+const cube_mod = rubix.cube;
 const facelet = rubix.facelet;
+const move_mod = rubix.move;
 const Face = facelet.Face;
 const FaceletCoord = facelet.FaceletCoord;
+
+const face_order = [_]Face{ .up, .right, .front, .down, .left, .back };
 
 fn expectFaceletMapping(face: Face, index: usize, expected: FaceletCoord) !void {
     const coord = facelet.faceletCoord(face, index);
@@ -11,17 +15,33 @@ fn expectFaceletMapping(face: Face, index: usize, expected: FaceletCoord) !void 
     try std.testing.expectEqual(index, facelet.faceletIndex(face, expected));
 }
 
-test "facelet coordinates round trip for every facelet" {
-    const faces = [_]Face{
-        .up,
-        .down,
-        .front,
-        .back,
-        .left,
-        .right,
+fn colorChar(color: facelet.Color) u8 {
+    return switch (color) {
+        .white => 'W',
+        .yellow => 'Y',
+        .green => 'G',
+        .blue => 'B',
+        .orange => 'O',
+        .red => 'R',
     };
+}
 
-    for (faces) |face| {
+fn expectFaceletString(cube: cube_mod.Cube, expected: []const u8) !void {
+    var actual: [54]u8 = undefined;
+    var position: usize = 0;
+
+    for (face_order) |face| {
+        for (0..9) |index| {
+            actual[position] = colorChar(facelet.color(cube, face, index));
+            position += 1;
+        }
+    }
+
+    try std.testing.expectEqualStrings(expected, &actual);
+}
+
+test "facelet coordinates round trip for every facelet" {
+    for (face_order) |face| {
         for (0..9) |index| {
             const coord = facelet.faceletCoord(face, index);
             try std.testing.expectEqual(index, facelet.faceletIndex(face, coord));
@@ -48,18 +68,10 @@ test "facelet coordinates preserve mirrored down back and right layouts" {
 }
 
 test "facelet coordinates cover the visible cubies and stickers" {
-    const faces = [_]Face{
-        .up,
-        .down,
-        .front,
-        .back,
-        .left,
-        .right,
-    };
     var visible_cubies = [_]bool{false} ** 27;
     var sticker_count: usize = 0;
 
-    for (faces) |face| {
+    for (face_order) |face| {
         for (0..9) |index| {
             const coord = facelet.faceletCoord(face, index);
             const x: usize = @intCast(@as(isize, coord.x) + 1);
@@ -78,4 +90,49 @@ test "facelet coordinates cover the visible cubies and stickers" {
     try std.testing.expectEqual(@as(usize, 26), cubie_count);
     try std.testing.expectEqual(@as(usize, 54), sticker_count);
     try std.testing.expect(!visible_cubies[13]);
+}
+
+test "facelet projection pins known move cases" {
+    const fixtures = .{
+        .{ move_mod.Move.U, "WWWWWWWWWBBBRRRRRRRRRGGGGGGYYYYYYYYYGGGOOOOOOOOOBBBBBB" },
+        .{ move_mod.Move.UPrime, "WWWWWWWWWGGGRRRRRROOOGGGGGGYYYYYYYYYBBBOOOOOORRRBBBBBB" },
+        .{ move_mod.Move.U2, "WWWWWWWWWOOORRRRRRBBBGGGGGGYYYYYYYYYRRROOOOOOGGGBBBBBB" },
+        .{ move_mod.Move.D, "WWWWWWWWWRRRRRRGGGGGGGGGOOOYYYYYYYYYOOOOOOBBBBBBBBBRRR" },
+        .{ move_mod.Move.DPrime, "WWWWWWWWWRRRRRRBBBGGGGGGRRRYYYYYYYYYOOOOOOGGGBBBBBBOOO" },
+        .{ move_mod.Move.D2, "WWWWWWWWWRRRRRROOOGGGGGGBBBYYYYYYYYYOOOOOORRRBBBBBBGGG" },
+        .{ move_mod.Move.R, "WWGWWGWWGRRRRRRRRRGGYGGYGGYYYBYYBYYBOOOOOOOOOWBBWBBWBB" },
+        .{ move_mod.Move.RPrime, "WWBWWBWWBRRRRRRRRRGGWGGWGGWYYGYYGYYGOOOOOOOOOYBBYBBYBB" },
+        .{ move_mod.Move.R2, "WWYWWYWWYRRRRRRRRRGGBGGBGGBYYWYYWYYWOOOOOOOOOGBBGBBGBB" },
+        .{ move_mod.Move.L, "BWWBWWBWWRRRRRRRRRWGGWGGWGGGYYGYYGYYOOOOOOOOOBBYBBYBBY" },
+        .{ move_mod.Move.LPrime, "GWWGWWGWWRRRRRRRRRYGGYGGYGGBYYBYYBYYOOOOOOOOOBBWBBWBBW" },
+        .{ move_mod.Move.L2, "YWWYWWYWWRRRRRRRRRBGGBGGBGGWYYWYYWYYOOOOOOOOOBBGBBGBBG" },
+        .{ move_mod.Move.F, "WWWWWWOOOWRRWRRWRRGGGGGGGGGRRRYYYYYYOOYOOYOOYBBBBBBBBB" },
+        .{ move_mod.Move.FPrime, "WWWWWWRRRYRRYRRYRRGGGGGGGGGOOOYYYYYYOOWOOWOOWBBBBBBBBB" },
+        .{ move_mod.Move.F2, "WWWWWWYYYORRORRORRGGGGGGGGGWWWYYYYYYOOROOROORBBBBBBBBB" },
+        .{ move_mod.Move.B, "RRRWWWWWWRRYRRYRRYGGGGGGGGGYYYYYYOOOWOOWOOWOOBBBBBBBBB" },
+        .{ move_mod.Move.BPrime, "OOOWWWWWWRRWRRWRRWGGGGGGGGGYYYYYYRRRYOOYOOYOOBBBBBBBBB" },
+        .{ move_mod.Move.B2, "YYYWWWWWWRRORRORROGGGGGGGGGYYYYYYWWWROOROOROOBBBBBBBBB" },
+    };
+
+    try expectFaceletString(cube_mod.Cube.solved(), "WWWWWWWWWRRRRRRRRRGGGGGGGGGYYYYYYYYYOOOOOOOOOBBBBBBBBB");
+
+    inline for (fixtures) |fixture| {
+        var cube = cube_mod.Cube.solved();
+        cube.applyMove(fixture[0]);
+        try expectFaceletString(cube, fixture[1]);
+    }
+}
+
+test "facelet projection pins known algorithm cases" {
+    const sexy = [_]move_mod.Move{ .R, .U, .RPrime, .UPrime };
+    var cube = cube_mod.Cube.solved();
+    cube.applyMoves(&sexy);
+
+    try expectFaceletString(cube, "WWOWWGWWGRRWBRRWRRGGYGGWGGGYYRYYYYYYBOOOOOOOOBRRBBBBBB");
+
+    const sledge = [_]move_mod.Move{ .RPrime, .F, .R, .FPrime };
+    cube = cube_mod.Cube.solved();
+    cube.applyMoves(&sledge);
+
+    try expectFaceletString(cube, "WWGWWGBRRYWWRRRRRRRGGGGWGGWYYGYYYYYYOOWOOOOOOOBBBBBBBB");
 }
