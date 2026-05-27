@@ -9,6 +9,7 @@ const Move = cube_mod.Move;
 fn expectSolved(cube: Cube) !void {
     try std.testing.expect(cube.isSolved());
     try std.testing.expectEqual(Cube.solved().bits, cube.bits);
+    try cube.validate();
 }
 
 fn expectOneTurnUnsolved(comptime turn: fn (*Cube) void) !void {
@@ -49,6 +50,24 @@ fn expectDoubleMove(comptime move: Move, comptime turn: fn (*Cube) void) !void {
     turn(&from_turns);
 
     try std.testing.expectEqual(from_turns.bits, from_move.bits);
+}
+
+fn setRawChunk(bits: cube_mod.CubeBits, position_index: u7, chunk: u5) cube_mod.CubeBits {
+    const chunk_size = 5;
+    const chunk_mask: cube_mod.CubeBits = 0b11111;
+    const shift = position_index * chunk_size;
+    const clear_mask = ~(chunk_mask << shift);
+    return (bits & clear_mask) | (@as(cube_mod.CubeBits, chunk) << shift);
+}
+
+fn swapRawChunks(bits: cube_mod.CubeBits, a: u7, b: u7) cube_mod.CubeBits {
+    const chunk_size = 5;
+    const chunk_mask: cube_mod.CubeBits = 0b11111;
+    const a_shift = a * chunk_size;
+    const b_shift = b * chunk_size;
+    const a_chunk: u5 = @truncate((bits >> a_shift) & chunk_mask);
+    const b_chunk: u5 = @truncate((bits >> b_shift) & chunk_mask);
+    return setRawChunk(setRawChunk(bits, a, b_chunk), b, a_chunk);
 }
 
 fn expectFaceletMapping(face: Face, index: usize, expected: FaceletCoord) !void {
@@ -113,6 +132,108 @@ test "move names use standard notation" {
     try std.testing.expectEqualStrings("R", cube_mod.moveName(.R));
     try std.testing.expectEqualStrings("R'", cube_mod.moveName(.RPrime));
     try std.testing.expectEqualStrings("R2", cube_mod.moveName(.R2));
+}
+
+test "inverseMove maps every move to its inverse" {
+    inline for (std.meta.fields(Move)) |field| {
+        const move: Move = @enumFromInt(field.value);
+        var cube = Cube.solved();
+
+        cube.applyMove(move);
+        cube.applyMove(cube_mod.inverseMove(move));
+
+        try expectSolved(cube);
+        try std.testing.expectEqual(move, cube_mod.inverseMove(cube_mod.inverseMove(move)));
+    }
+}
+
+test "applyMoves applies an algorithm slice in order" {
+    const algorithm = [_]Move{ .R, .U, .RPrime, .UPrime };
+    var from_helper = Cube.solved();
+    var from_loop = Cube.solved();
+
+    from_helper.applyMoves(&algorithm);
+    for (algorithm) |move| {
+        from_loop.applyMove(move);
+    }
+
+    try std.testing.expectEqual(from_loop.bits, from_helper.bits);
+    try std.testing.expect(!from_helper.isSolved());
+}
+
+test "scramble followed by inverse sequence returns solved" {
+    var prng = std.Random.DefaultPrng.init(12345);
+    const random = prng.random();
+    const scramble = Cube.scramble(random);
+
+    var inverse: [cube_mod.scramble_length]Move = undefined;
+    for (scramble.moves, 0..) |move, index| {
+        inverse[cube_mod.scramble_length - 1 - index] = cube_mod.inverseMove(move);
+    }
+
+    var cube = Cube.solved();
+    cube.applyMoves(&scramble.moves);
+    try std.testing.expect(!cube.isSolved());
+
+    cube.applyMoves(&inverse);
+    try expectSolved(cube);
+}
+
+test "validation accepts solved cube moves and scrambles" {
+    try Cube.solved().validate();
+
+    inline for (std.meta.fields(Move)) |field| {
+        const move: Move = @enumFromInt(field.value);
+        var cube = Cube.solved();
+        cube.applyMove(move);
+        try cube.validate();
+    }
+
+    var prng = std.Random.DefaultPrng.init(12345);
+    const random = prng.random();
+    const scramble = Cube.scramble(random);
+    var cube = Cube.solved();
+    for (scramble.moves) |move| {
+        cube.applyMove(move);
+        try cube.validate();
+    }
+}
+
+test "validation rejects malformed cube bits" {
+    const solved = Cube.solved();
+
+    var invalid_corner_orientation = solved;
+    invalid_corner_orientation.bits = setRawChunk(invalid_corner_orientation.bits, 0, 0b11000);
+    try std.testing.expectError(error.InvalidCornerOrientation, invalid_corner_orientation.validate());
+
+    var duplicate_corner = solved;
+    duplicate_corner.bits = setRawChunk(duplicate_corner.bits, 1, 0b00000);
+    try std.testing.expectError(error.DuplicateCorner, duplicate_corner.validate());
+
+    var invalid_edge_piece = solved;
+    invalid_edge_piece.bits = setRawChunk(invalid_edge_piece.bits, 8, 0b01100);
+    try std.testing.expectError(error.InvalidEdgePiece, invalid_edge_piece.validate());
+
+    var duplicate_edge = solved;
+    duplicate_edge.bits = setRawChunk(duplicate_edge.bits, 9, 0b00000);
+    try std.testing.expectError(error.DuplicateEdge, duplicate_edge.validate());
+}
+
+test "validation rejects mismatched corner and edge permutation parity" {
+    const solved = Cube.solved();
+
+    var swapped_corners = solved;
+    swapped_corners.bits = swapRawChunks(swapped_corners.bits, 0, 1);
+    try std.testing.expectError(error.MismatchedPermutationParity, swapped_corners.validate());
+
+    var swapped_edges = solved;
+    swapped_edges.bits = swapRawChunks(swapped_edges.bits, 8, 9);
+    try std.testing.expectError(error.MismatchedPermutationParity, swapped_edges.validate());
+
+    var matching_parity = solved;
+    matching_parity.bits = swapRawChunks(matching_parity.bits, 0, 1);
+    matching_parity.bits = swapRawChunks(matching_parity.bits, 8, 9);
+    try matching_parity.validate();
 }
 
 test "facelet coordinates round trip for every facelet" {

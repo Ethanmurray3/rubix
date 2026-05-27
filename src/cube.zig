@@ -79,6 +79,18 @@ pub const MoveAxis = enum {
     front_back,
 };
 
+pub const ValidationError = error{
+    DuplicateCorner,
+    MissingCorner,
+    InvalidCornerOrientation,
+    InvalidCornerTwist,
+    InvalidEdgePiece,
+    DuplicateEdge,
+    MissingEdge,
+    InvalidEdgeFlip,
+    MismatchedPermutationParity,
+};
+
 pub const scramble_length = 20;
 
 pub const Scramble = struct {
@@ -149,6 +161,72 @@ pub const Cube = struct {
         return self.bits == solved_bits;
     }
 
+    pub fn validate(self: Cube) ValidationError!void {
+        const corner_positions = [_]Position{
+            .ufr,
+            .urb,
+            .ubl,
+            .ulf,
+            .dfr,
+            .drb,
+            .dbl,
+            .dlf,
+        };
+        const edge_positions = [_]Position{
+            .uf,
+            .ur,
+            .ub,
+            .ul,
+            .fr,
+            .br,
+            .bl,
+            .fl,
+            .df,
+            .dr,
+            .db,
+            .dl,
+        };
+
+        var seen_corners: u8 = 0;
+        var corner_orientation_sum: u8 = 0;
+        var corner_permutation: [8]u4 = undefined;
+        for (corner_positions, 0..) |position, index| {
+            const chunk = getChunk(self.bits, position);
+            const piece: u3 = @truncate(chunk & 0b00111);
+            const orientation = cornerOrientation(chunk);
+            if (orientation >= 3) return ValidationError.InvalidCornerOrientation;
+
+            const piece_mask = @as(u8, 1) << piece;
+            if ((seen_corners & piece_mask) != 0) return ValidationError.DuplicateCorner;
+            seen_corners |= piece_mask;
+            corner_orientation_sum += orientation;
+            corner_permutation[index] = piece;
+        }
+        if (seen_corners != 0xff) return ValidationError.MissingCorner;
+        if (corner_orientation_sum % 3 != 0) return ValidationError.InvalidCornerTwist;
+
+        var seen_edges: u12 = 0;
+        var edge_orientation_sum: u8 = 0;
+        var edge_permutation: [12]u4 = undefined;
+        for (edge_positions, 0..) |position, index| {
+            const chunk = getChunk(self.bits, position);
+            const piece: u4 = @truncate(chunk & 0b01111);
+            if (piece >= 12) return ValidationError.InvalidEdgePiece;
+
+            const orientation = edgeOrientation(chunk);
+            const piece_mask = @as(u12, 1) << piece;
+            if ((seen_edges & piece_mask) != 0) return ValidationError.DuplicateEdge;
+            seen_edges |= piece_mask;
+            edge_orientation_sum += orientation;
+            edge_permutation[index] = piece;
+        }
+        if (seen_edges != 0xfff) return ValidationError.MissingEdge;
+        if (edge_orientation_sum % 2 != 0) return ValidationError.InvalidEdgeFlip;
+        if (permutationParity(&corner_permutation) != permutationParity(&edge_permutation)) {
+            return ValidationError.MismatchedPermutationParity;
+        }
+    }
+
     pub fn scramble(random: std.Random) Scramble {
         var result: Scramble = undefined;
         var previous: ?Move = null;
@@ -165,6 +243,12 @@ pub const Cube = struct {
         }
 
         return result;
+    }
+
+    pub fn applyMoves(self: *Cube, moves: []const Move) void {
+        for (moves) |move| {
+            self.applyMove(move);
+        }
     }
 
     pub fn applyMove(self: *Cube, move: Move) void {
@@ -511,6 +595,29 @@ pub fn moveAxis(move: Move) MoveAxis {
     };
 }
 
+pub fn inverseMove(move: Move) Move {
+    return switch (move) {
+        .U => .UPrime,
+        .UPrime => .U,
+        .U2 => .U2,
+        .D => .DPrime,
+        .DPrime => .D,
+        .D2 => .D2,
+        .R => .RPrime,
+        .RPrime => .R,
+        .R2 => .R2,
+        .L => .LPrime,
+        .LPrime => .L,
+        .L2 => .L2,
+        .F => .FPrime,
+        .FPrime => .F,
+        .F2 => .F2,
+        .B => .BPrime,
+        .BPrime => .B,
+        .B2 => .B2,
+    };
+}
+
 pub fn moveName(move: Move) []const u8 {
     return switch (move) {
         .U => "U",
@@ -672,6 +779,16 @@ fn edgeFromChunk(chunk: u5) Edge {
 
 fn edgeOrientation(chunk: u5) u1 {
     return @truncate(chunk >> 4);
+}
+
+fn permutationParity(permutation: []const u4) bool {
+    var odd = false;
+    for (permutation, 0..) |piece, index| {
+        for (permutation[index + 1 ..]) |later_piece| {
+            if (piece > later_piece) odd = !odd;
+        }
+    }
+    return odd;
 }
 
 fn cornerColor(position: Position, chunk: u5, face: Face) Color {
