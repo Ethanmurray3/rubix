@@ -1,10 +1,11 @@
 const std = @import("std");
 const rl = @import("raylib");
-const animation = @import("animation.zig");
 const controls = @import("controls.zig");
-const cube_mod = @import("cube.zig");
+const rubix = @import("rubix");
 const render = @import("render.zig");
-const ui = @import("ui.zig");
+const animation = rubix.animation;
+const cube_mod = rubix.cube;
+const ui = rubix.ui;
 
 pub const target_fps = 240;
 

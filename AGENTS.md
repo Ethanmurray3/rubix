@@ -26,7 +26,8 @@ Prioritize product quality, maintainability, portability, and learner outcomes. 
 - `src/app.zig` owns the GUI app loop and state transitions.
 - `src/main.zig` is only the GUI entry point.
 - `src/cli.zig` and `src/cli_core.zig` own the separate command-line executable and testable command behavior.
-- `src/root.zig` is the package module entry point.
+- `src/root.zig` is the pure `rubix` package module entry point and must stay free of raylib imports/exports.
+- `src/desktop.zig` is the `rubix_desktop` package module entry point for raylib-specific desktop frontend code.
 
 Future product modules should move toward:
 

@@ -1,8 +1,8 @@
 const std = @import("std");
-const rubix = @import("rubix");
+const rubix_desktop = @import("rubix_desktop");
 
-const camera_mod = rubix.camera;
-const render = rubix.render;
+const camera_mod = rubix_desktop.camera;
+const render = rubix_desktop.render;
 
 test "default orbit produces expected camera shape" {
     const orbit = camera_mod.Orbit{};

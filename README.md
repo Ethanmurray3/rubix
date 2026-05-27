@@ -56,7 +56,9 @@ J Perm's CFOP and algorithm pages are the main reference for curriculum organiza
 - `src/scramble.zig` owns scramble generation and scramble shape.
 - `src/notation.zig` parses and formats move notation such as `R U R' U'`.
 - `src/animation.zig` owns queued turn animation and commits moves only when animations finish.
-- Future `algorithm`, `cfop`, `cfop_cases`, `cfop_recognition`, `trainer`, `progress`, and `cfop_solver` modules should remain renderer-free so web, desktop, and future iOS frontends share the same product logic.
+- `src/root.zig` exports the pure `rubix` package. It should stay renderer-free so web, desktop, CLI, tests, and future iOS frontends share the same product logic.
+- Future `algorithm`, `cfop`, `cfop_cases`, `cfop_recognition`, `trainer`, `progress`, and `cfop_solver` modules should remain renderer-free.
+- `src/desktop.zig` exports the current raylib desktop frontend modules.
 - `src/render.zig` owns raylib cube drawing plus `Axis` and `Orientation` rendering data for the current desktop prototype.
 - `src/camera.zig` owns orbit camera math and view-axis helpers for the current desktop prototype.
 - `src/controls.zig` maps keyboard input and held-cube orientation into cube moves for the current desktop prototype.
@@ -65,7 +67,7 @@ J Perm's CFOP and algorithm pages are the main reference for curriculum organiza
 - `src/app.zig` owns the GUI app loop and state transitions.
 - `src/main.zig` is the small GUI entry point; `zig build run` still launches the raylib app.
 - `src/cli.zig` and `src/cli_core.zig` provide the separate `rubix-cli` executable behind `zig build cli -- ...`.
-- `src/root.zig` is the package entry point for tests and future library use.
+- `rubix_desktop` is the separate package entry point for raylib-specific tests and desktop code.
 
 ## Audit Decisions
 

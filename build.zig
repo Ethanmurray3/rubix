@@ -15,7 +15,13 @@ pub fn build(b: *std.Build) void {
     const mod = b.addModule("rubix", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
+    });
+
+    const desktop_mod = b.addModule("rubix_desktop", .{
+        .root_source_file = b.path("src/desktop.zig"),
+        .target = target,
         .imports = &.{
+            .{ .name = "rubix", .module = mod },
             .{ .name = "raylib", .module = raylib },
         },
     });
@@ -71,8 +77,8 @@ pub fn build(b: *std.Build) void {
     addRunTest(test_step, b.addTest(.{ .root_module = cli_exe.root_module }), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cube_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cli_test.zig"), b);
-    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/camera_test.zig"), b);
-    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/controls_test.zig"), b);
+    addRunTest(test_step, addDesktopTestFile(b, mod, desktop_mod, target, optimize, "test/camera_test.zig"), b);
+    addRunTest(test_step, addDesktopTestFile(b, mod, desktop_mod, target, optimize, "test/controls_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/animation_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/facelet_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/move_test.zig"), b);
@@ -95,6 +101,27 @@ fn addTestFile(
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "rubix", .module = mod },
+            },
+        }),
+    });
+}
+
+fn addDesktopTestFile(
+    b: *std.Build,
+    mod: *std.Build.Module,
+    desktop_mod: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    path: []const u8,
+) *std.Build.Step.Compile {
+    return b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(path),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "rubix", .module = mod },
+                .{ .name = "rubix_desktop", .module = desktop_mod },
             },
         }),
     });

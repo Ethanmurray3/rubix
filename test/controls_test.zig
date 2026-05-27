@@ -1,11 +1,12 @@
 const std = @import("std");
 const rubix = @import("rubix");
+const rubix_desktop = @import("rubix_desktop");
 
-const camera_mod = rubix.camera;
-const controls = rubix.controls;
+const camera_mod = rubix_desktop.camera;
+const controls = rubix_desktop.controls;
 const facelet = rubix.facelet;
 const move_mod = rubix.move;
-const render = rubix.render;
+const render = rubix_desktop.render;
 
 test "moveForFace covers all face and prime variants" {
     try std.testing.expectEqual(move_mod.Move.U, controls.moveForFace(.up, false));

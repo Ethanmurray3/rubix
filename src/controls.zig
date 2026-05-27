@@ -1,8 +1,9 @@
 const rl = @import("raylib");
 const camera = @import("camera.zig");
-const facelet = @import("facelet.zig");
-const move_mod = @import("move.zig");
+const rubix = @import("rubix");
 const render = @import("render.zig");
+const facelet = rubix.facelet;
+const move_mod = rubix.move;
 
 const Face = facelet.Face;
 const Move = move_mod.Move;

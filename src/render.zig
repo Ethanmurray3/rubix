@@ -1,7 +1,8 @@
 const rl = @import("raylib");
-const animation = @import("animation.zig");
-const cube_mod = @import("cube.zig");
-const facelet = @import("facelet.zig");
+const rubix = @import("rubix");
+const animation = rubix.animation;
+const cube_mod = rubix.cube;
+const facelet = rubix.facelet;
 
 const Cube = cube_mod.Cube;
 const CubeColor = facelet.Color;
