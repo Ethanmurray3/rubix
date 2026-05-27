@@ -67,6 +67,18 @@ test "facelet coordinates preserve mirrored down back and right layouts" {
     try expectFaceletMapping(.right, 8, .{ .x = 1, .y = -1, .z = -1 });
 }
 
+test "checked facelet indices reject invalid coordinates and off-face coordinates" {
+    try std.testing.expectError(
+        facelet.FaceletIndexError.InvalidAxisCoord,
+        facelet.faceletIndexChecked(.up, .{ .x = -2, .y = 1, .z = 0 }),
+    );
+    try std.testing.expectError(
+        facelet.FaceletIndexError.NotOnFace,
+        facelet.faceletIndexChecked(.up, .{ .x = 0, .y = 0, .z = 0 }),
+    );
+    try std.testing.expectEqual(@as(usize, 4), try facelet.faceletIndexChecked(.front, .{ .x = 0, .y = 0, .z = 1 }));
+}
+
 test "facelet coordinates cover the visible cubies and stickers" {
     var visible_cubies = [_]bool{false} ** 27;
     var sticker_count: usize = 0;

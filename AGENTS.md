@@ -16,8 +16,14 @@ Prioritize clear code and avoid premature abstractions. The code should stay rea
 - `src/facelet.zig` owns face/color types, facelet coordinate mapping, and cube-to-sticker color projection.
 - `src/notation.zig` owns algorithm parsing and formatting.
 - `src/animation.zig` owns pure move-queue animation state, magnetic easing, visual turn progress, and delayed move commits.
-- `src/render.zig` owns raylib 3D cube drawing and held-cube orientation rendering.
-- `src/main.zig` owns the app loop, window setup, camera, input mapping, scramble/reset, and UI overlay.
+- `src/render.zig` owns raylib 3D cube drawing plus `Axis` and `Orientation`.
+- `src/camera.zig` owns orbit camera math and view-axis helpers.
+- `src/controls.zig` owns keyboard-to-move mapping and held-cube orientation input.
+- `src/ui.zig` owns status strings, face names, and scramble notation formatting.
+- `src/gui.zig` owns raylib window setup, frame drawing, and overlay drawing.
+- `src/app.zig` owns the GUI app loop and state transitions.
+- `src/main.zig` is only the GUI entry point.
+- `src/cli.zig` and `src/cli_core.zig` own the separate command-line executable and testable command behavior.
 - `src/root.zig` is the package module entry point.
 
 The cube state is represented as a wrapper around one `u100`:
@@ -29,6 +35,12 @@ pub const Cube = struct {
 ```
 
 There is no sticker-array state. Rendering reads colors from the packed cube bits through `facelet.color(...)`.
+
+`Cube.bits` is intentionally public as a low-level value-type API while this remains a systems-learning project. Tests, fixtures, and future debug/CLI tools may construct raw states, but public raw states must continue to pass `Cube.validate()` before being treated as physical cubes.
+
+Move tables are hand-coded for now. The risk is covered by validation, corner/edge permutation parity checks, and known facelet fixtures for all 18 moves. Defer generated or data-driven move tables until solver/search work needs them.
+
+`facelet.faceletIndex(...)` is the fast assert-style helper for trusted internal coordinates. Use `facelet.faceletIndexChecked(...)` for any path that accepts unchecked coordinates and should return an error instead of asserting.
 
 ## Rendering and UI Rules
 
@@ -203,7 +215,7 @@ R': UFR -> DFR (+1), DFR -> DRB (+2), DRB -> URB (+1), URB -> UFR (+2)
    - Do a manual GUI pass on moving-layer transforms from multiple camera angles and held-cube orientations.
 
 2. Architecture cleanup for portability
-   - Split `main.zig` responsibilities into small modules over time: app state/input, UI overlay, and rendering.
+   - Keep the new `app`, `camera`, `controls`, `ui`, and `gui` boundaries small and testable.
    - Keep pure logic modules free of raylib imports so they can be tested and reused for desktop, web, and mobile experiments.
    - Add WebAssembly build notes once the app loop is structured for web.
 
@@ -214,10 +226,10 @@ R': UFR -> DFR (+1), DFR -> DRB (+2), DRB -> URB (+1), URB -> UFR (+2)
    - Keep sounds optional and easy to disable for web/mobile.
 
 4. CFOP trainer foundation
-   - Add algorithm notation parsing for sequences like `R U R' U'`.
    - Add algorithm playback through the same move queue used by input.
    - Build helper/trainer behavior before attempting a full optimal solver.
    - Start with beginner-friendly CFOP data: cross/F2L guidance, then 2-look OLL/PLL, then full OLL/PLL.
+   - Defer data-driven move tables until solver/search work needs generated transition data.
 
 5. Helper UI
    - Highlight relevant cube pieces/stickers for the current learning step.

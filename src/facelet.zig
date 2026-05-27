@@ -26,6 +26,11 @@ pub const FaceletCoord = struct {
     z: i2,
 };
 
+pub const FaceletIndexError = error{
+    InvalidAxisCoord,
+    NotOnFace,
+};
+
 const Position = enum(u5) {
     ufr = 0,
     urb = 1,
@@ -187,33 +192,37 @@ pub fn faceletCoord(face: Face, index: usize) FaceletCoord {
 }
 
 pub fn faceletIndex(face: Face, coord: FaceletCoord) usize {
-    assertAxisCoord(coord.x);
-    assertAxisCoord(coord.y);
-    assertAxisCoord(coord.z);
+    return faceletIndexChecked(face, coord) catch unreachable;
+}
+
+pub fn faceletIndexChecked(face: Face, coord: FaceletCoord) FaceletIndexError!usize {
+    if (!isAxisCoord(coord.x) or !isAxisCoord(coord.y) or !isAxisCoord(coord.z)) {
+        return FaceletIndexError.InvalidAxisCoord;
+    }
 
     return switch (face) {
         .up => block: {
-            std.debug.assert(coord.y == 1);
+            if (coord.y != 1) return FaceletIndexError.NotOnFace;
             break :block faceletIndexFromRowCol(gridFromAxisCoord(coord.z), gridFromAxisCoord(coord.x));
         },
         .down => block: {
-            std.debug.assert(coord.y == -1);
+            if (coord.y != -1) return FaceletIndexError.NotOnFace;
             break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.z), gridFromAxisCoord(coord.x));
         },
         .front => block: {
-            std.debug.assert(coord.z == 1);
+            if (coord.z != 1) return FaceletIndexError.NotOnFace;
             break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(coord.x));
         },
         .back => block: {
-            std.debug.assert(coord.z == -1);
+            if (coord.z != -1) return FaceletIndexError.NotOnFace;
             break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(-coord.x));
         },
         .left => block: {
-            std.debug.assert(coord.x == -1);
+            if (coord.x != -1) return FaceletIndexError.NotOnFace;
             break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(coord.z));
         },
         .right => block: {
-            std.debug.assert(coord.x == 1);
+            if (coord.x != 1) return FaceletIndexError.NotOnFace;
             break :block faceletIndexFromRowCol(gridFromAxisCoord(-coord.y), gridFromAxisCoord(-coord.z));
         },
     };
@@ -241,7 +250,11 @@ fn faceletIndexFromRowCol(row: usize, col: usize) usize {
 }
 
 fn assertAxisCoord(value: i2) void {
-    std.debug.assert(value >= -1 and value <= 1);
+    std.debug.assert(isAxisCoord(value));
+}
+
+fn isAxisCoord(value: i2) bool {
+    return value >= -1 and value <= 1;
 }
 
 fn cornerFromChunk(chunk: u5) cube_mod.Corner {
