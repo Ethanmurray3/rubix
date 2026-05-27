@@ -4,9 +4,20 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const raylib_dep = b.dependency("raylib_zig", .{
+        .target = target,
+        .optimize = optimize,
+        .linux_display_backend = .Both,
+    });
+    const raylib = raylib_dep.module("raylib");
+    const raylib_artifact = raylib_dep.artifact("raylib");
+
     const mod = b.addModule("rubix", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "raylib", .module = raylib },
+        },
     });
 
     const exe = b.addExecutable(.{
@@ -17,6 +28,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "rubix", .module = mod },
+                .{ .name = "raylib", .module = raylib },
             },
         }),
     });
@@ -33,16 +45,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const raylib_dep = b.dependency("raylib_zig", .{
-        .target = target,
-        .optimize = optimize,
-        .linux_display_backend = .Both,
-    });
-    const raylib = raylib_dep.module("raylib");
-    const raylib_artifact = raylib_dep.artifact("raylib");
-
     exe.root_module.linkLibrary(raylib_artifact);
-    exe.root_module.addImport("raylib", raylib);
     b.installArtifact(exe);
     b.installArtifact(cli_exe);
 
@@ -68,11 +71,14 @@ pub fn build(b: *std.Build) void {
     addRunTest(test_step, b.addTest(.{ .root_module = cli_exe.root_module }), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cube_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cli_test.zig"), b);
+    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/camera_test.zig"), b);
+    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/controls_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/animation_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/facelet_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/move_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/scramble_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/notation_test.zig"), b);
+    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/ui_test.zig"), b);
 }
 
 fn addTestFile(

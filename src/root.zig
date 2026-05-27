@@ -1,7 +1,13 @@
+pub const app = @import("app.zig");
+pub const camera = @import("camera.zig");
 pub const cli_core = @import("cli_core.zig");
+pub const controls = @import("controls.zig");
 pub const cube = @import("cube.zig");
 pub const facelet = @import("facelet.zig");
+pub const gui = @import("gui.zig");
 pub const move = @import("move.zig");
+pub const render = @import("render.zig");
 pub const scramble = @import("scramble.zig");
 pub const animation = @import("animation.zig");
 pub const notation = @import("notation.zig");
+pub const ui = @import("ui.zig");
