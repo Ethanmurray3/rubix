@@ -172,6 +172,19 @@ pub fn build(b: *std.Build) void {
 
     const run_animation_tests = b.addRunArtifact(animation_tests);
 
+    const facelet_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/facelet_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "rubix", .module = mod },
+            },
+        }),
+    });
+
+    const run_facelet_tests = b.addRunArtifact(facelet_tests);
+
     const move_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("test/move_test.zig"),
@@ -219,6 +232,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_exe_tests.step);
     test_step.dependOn(&run_cube_tests.step);
     test_step.dependOn(&run_animation_tests.step);
+    test_step.dependOn(&run_facelet_tests.step);
     test_step.dependOn(&run_move_tests.step);
     test_step.dependOn(&run_scramble_tests.step);
     test_step.dependOn(&run_notation_tests.step);

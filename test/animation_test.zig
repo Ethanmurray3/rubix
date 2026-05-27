@@ -3,10 +3,11 @@ const rubix = @import("rubix");
 
 const animation = rubix.animation;
 const cube_mod = rubix.cube;
+const facelet = rubix.facelet;
 const move_mod = rubix.move;
 const scramble_mod = rubix.scramble;
 const Cube = cube_mod.Cube;
-const Face = cube_mod.Face;
+const Face = facelet.Face;
 const Move = move_mod.Move;
 const PlayerAnimator = animation.PlayerAnimator;
 const ScrambleAnimator = animation.ScrambleAnimator;

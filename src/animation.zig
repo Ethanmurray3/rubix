@@ -1,10 +1,11 @@
 const std = @import("std");
 const cube_mod = @import("cube.zig");
+const facelet = @import("facelet.zig");
 const move_mod = @import("move.zig");
 const scramble_mod = @import("scramble.zig");
 
 const Cube = cube_mod.Cube;
-const Face = cube_mod.Face;
+const Face = facelet.Face;
 const Move = move_mod.Move;
 const Scramble = scramble_mod.Scramble;
 
@@ -160,7 +161,7 @@ pub fn visualTurnForProgress(move: Move, progress: f32) VisualTurn {
     const clamped = clampProgress(progress);
     const spring = magneticProgress(clamped);
     return .{
-        .face = cube_mod.moveFace(move),
+        .face = facelet.moveFace(move),
         .angle_degrees = targetAngle(move) * spring,
     };
 }

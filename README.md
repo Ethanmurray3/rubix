@@ -37,7 +37,8 @@ zig fmt --check build.zig src/*.zig test/*.zig
 
 ## Architecture
 
-- `src/cube.zig` owns the packed `u100` cube state, cubie encoding, move application, validation, and facelet projection.
+- `src/cube.zig` owns the packed `u100` cube state, cubie encoding, move application, and validation.
+- `src/facelet.zig` owns face/color types, facelet coordinate mapping, and cube-to-sticker color projection.
 - `src/move.zig` owns move enums, move axes, inverse moves, and standard move names.
 - `src/scramble.zig` owns scramble generation and scramble shape.
 - `src/notation.zig` parses and formats move notation such as `R U R' U'`.

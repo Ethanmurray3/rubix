@@ -1,11 +1,12 @@
 const rl = @import("raylib");
 const animation = @import("animation.zig");
 const cube_mod = @import("cube.zig");
+const facelet = @import("facelet.zig");
 
 const Cube = cube_mod.Cube;
-const CubeColor = cube_mod.Color;
-const Face = cube_mod.Face;
-const FaceletCoord = cube_mod.FaceletCoord;
+const CubeColor = facelet.Color;
+const Face = facelet.Face;
+const FaceletCoord = facelet.FaceletCoord;
 
 pub const Axis = enum {
     positive_x,
@@ -114,11 +115,11 @@ fn drawStaticCubie(cube: Cube, orientation: Orientation, coord: FaceletCoord) vo
     inline for (.{ Face.up, Face.down, Face.front, Face.back, Face.left, Face.right }) |face| {
         if (coordOnFace(coord, face)) {
             const sticker = stickerTransform(coord, face);
-            const index = cube_mod.faceletIndex(face, coord);
+            const index = facelet.faceletIndex(face, coord);
             drawSticker(
                 orientation.transformPosition(sticker.position),
                 orientation.transformSize(sticker.size),
-                rayColor(cube.facelet(face, index)),
+                rayColor(facelet.color(cube, face, index)),
             );
         }
     }
@@ -144,8 +145,8 @@ fn drawTransformedCubie(
     inline for (.{ Face.up, Face.down, Face.front, Face.back, Face.left, Face.right }) |face| {
         if (coordOnFace(coord, face)) {
             const sticker = stickerTransform(coord, face);
-            const index = cube_mod.faceletIndex(face, coord);
-            drawSticker(sticker.position, sticker.size, rayColor(cube.facelet(face, index)));
+            const index = facelet.faceletIndex(face, coord);
+            drawSticker(sticker.position, sticker.size, rayColor(facelet.color(cube, face, index)));
         }
     }
 }

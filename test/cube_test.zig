@@ -4,8 +4,6 @@ const cube_mod = rubix.cube;
 const move_mod = rubix.move;
 const scramble_mod = rubix.scramble;
 const Cube = cube_mod.Cube;
-const Face = cube_mod.Face;
-const FaceletCoord = cube_mod.FaceletCoord;
 const Move = move_mod.Move;
 
 fn expectSolved(cube: Cube) !void {
@@ -70,12 +68,6 @@ fn swapRawChunks(bits: cube_mod.CubeBits, a: u7, b: u7) cube_mod.CubeBits {
     const a_chunk: u5 = @truncate((bits >> a_shift) & chunk_mask);
     const b_chunk: u5 = @truncate((bits >> b_shift) & chunk_mask);
     return setRawChunk(setRawChunk(bits, a, b_chunk), b, a_chunk);
-}
-
-fn expectFaceletMapping(face: Face, index: usize, expected: FaceletCoord) !void {
-    const coord = cube_mod.faceletCoord(face, index);
-    try std.testing.expectEqual(expected, coord);
-    try std.testing.expectEqual(index, cube_mod.faceletIndex(face, expected));
 }
 
 test "solved cube reports solved" {
@@ -229,75 +221,6 @@ test "validation rejects mismatched corner and edge permutation parity" {
     matching_parity.bits = swapRawChunks(matching_parity.bits, 0, 1);
     matching_parity.bits = swapRawChunks(matching_parity.bits, 8, 9);
     try matching_parity.validate();
-}
-
-test "facelet coordinates round trip for every facelet" {
-    const faces = [_]Face{
-        .up,
-        .down,
-        .front,
-        .back,
-        .left,
-        .right,
-    };
-
-    for (faces) |face| {
-        for (0..9) |index| {
-            const coord = cube_mod.faceletCoord(face, index);
-            try std.testing.expectEqual(index, cube_mod.faceletIndex(face, coord));
-            try std.testing.expectEqual(coord, cube_mod.faceletCoord(face, cube_mod.faceletIndex(face, coord)));
-        }
-    }
-}
-
-test "facelet coordinates preserve mirrored down back and right layouts" {
-    try expectFaceletMapping(.down, 0, .{ .x = -1, .y = -1, .z = 1 });
-    try expectFaceletMapping(.down, 2, .{ .x = 1, .y = -1, .z = 1 });
-    try expectFaceletMapping(.down, 6, .{ .x = -1, .y = -1, .z = -1 });
-    try expectFaceletMapping(.down, 8, .{ .x = 1, .y = -1, .z = -1 });
-
-    try expectFaceletMapping(.back, 0, .{ .x = 1, .y = 1, .z = -1 });
-    try expectFaceletMapping(.back, 2, .{ .x = -1, .y = 1, .z = -1 });
-    try expectFaceletMapping(.back, 6, .{ .x = 1, .y = -1, .z = -1 });
-    try expectFaceletMapping(.back, 8, .{ .x = -1, .y = -1, .z = -1 });
-
-    try expectFaceletMapping(.right, 0, .{ .x = 1, .y = 1, .z = 1 });
-    try expectFaceletMapping(.right, 2, .{ .x = 1, .y = 1, .z = -1 });
-    try expectFaceletMapping(.right, 6, .{ .x = 1, .y = -1, .z = 1 });
-    try expectFaceletMapping(.right, 8, .{ .x = 1, .y = -1, .z = -1 });
-}
-
-test "facelet coordinates cover the visible cubies and stickers" {
-    const faces = [_]Face{
-        .up,
-        .down,
-        .front,
-        .back,
-        .left,
-        .right,
-    };
-    var visible_cubies = [_]bool{false} ** 27;
-    var sticker_count: usize = 0;
-
-    for (faces) |face| {
-        for (0..9) |index| {
-            const coord = cube_mod.faceletCoord(face, index);
-            const x: usize = @intCast(@as(isize, coord.x) + 1);
-            const y: usize = @intCast(@as(isize, coord.y) + 1);
-            const z: usize = @intCast(@as(isize, coord.z) + 1);
-            visible_cubies[x * 9 + y * 3 + z] = true;
-            sticker_count += 1;
-        }
-    }
-
-    var cubie_count: usize = 0;
-    for (visible_cubies) |visible| {
-        if (visible) cubie_count += 1;
-    }
-
-    try std.testing.expectEqual(@as(usize, 26), cubie_count);
-    try std.testing.expectEqual(@as(usize, 54), sticker_count);
-    try std.testing.expect(!visible_cubies[13]);
 }
 
 test "scramble can be applied explicitly to a cube" {

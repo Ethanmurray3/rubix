@@ -10,7 +10,11 @@ Prioritize clear code and avoid premature abstractions. The code should stay rea
 
 ## Current Architecture
 
-- `src/cube.zig` owns packed cube state, cube logic, moves, scramble generation, and `Cube.facelet(...)`.
+- `src/cube.zig` owns packed cube state, cube logic, move application, and validation.
+- `src/move.zig` owns move types, move axes, inverse moves, and standard move names.
+- `src/scramble.zig` owns scramble shape and generation.
+- `src/facelet.zig` owns face/color types, facelet coordinate mapping, and cube-to-sticker color projection.
+- `src/notation.zig` owns algorithm parsing and formatting.
 - `src/animation.zig` owns pure move-queue animation state, magnetic easing, visual turn progress, and delayed move commits.
 - `src/render.zig` owns raylib 3D cube drawing and held-cube orientation rendering.
 - `src/main.zig` owns the app loop, window setup, camera, input mapping, scramble/reset, and UI overlay.
@@ -24,12 +28,12 @@ pub const Cube = struct {
 };
 ```
 
-There is no sticker-array state. Rendering reads colors from the packed cube bits through `Cube.facelet(...)`.
+There is no sticker-array state. Rendering reads colors from the packed cube bits through `facelet.color(...)`.
 
 ## Rendering and UI Rules
 
 - Keep raylib as the active rendering backend for now.
-- Rendering must read cube state through `Cube.facelet(...)`; do not introduce a separate sticker-array source of truth.
+- Rendering must read cube state through `facelet.color(...)`; do not introduce a separate sticker-array source of truth.
 - Camera movement and held-cube orientation are UI/render concerns, not cube-state mutations.
 - `render.Orientation` changes how the cube is viewed and controlled; it must not call cube move methods or rewrite `Cube.bits`.
 - `animation.Animator` queues moves and commits them to `Cube.applyMove(...)` only when the active visual turn finishes.
@@ -179,7 +183,7 @@ Then read from `old`, write to `new`, and assign `self.bits = new`.
 
 For `U`, `U'`, `D`, and `D'`, move whole 5-bit chunks without changing orientation.
 
-For `R`, `R'`, `L`, and `L'`, move whole edge chunks without flipping edges. Corner chunks must be moved with orientation changes that match `Cube.facelet(...)`.
+For `R`, `R'`, `L`, and `L'`, move whole edge chunks without flipping edges. Corner chunks must be moved with orientation changes that match `facelet.color(...)`.
 
 For `F`, `F'`, `B`, and `B'`, move corner chunks with orientation changes and flip every moved edge chunk.
 
