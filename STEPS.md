@@ -9,50 +9,48 @@
 - Starter 2-look case data: `cfop_cases.zig` has an initial small static catalog for 2-look OLL/PLL with setup and solution fixtures.
 - Starter recognition: `cfop_recognition.zig` can identify the current starter setup fixtures by exact cube state.
 - Review fixes: rotation expansion, starter U-perm data, semantic fixture tests, empty-name validation, and exact-recognition documentation are complete.
+- Full 2-look case data: `cfop_cases.zig` now covers 10 OLL cases and 6 PLL cases with inverse setup fixtures.
+- AUF-aware recognition: `cfop_recognition.zig` returns solved, known, or unsupported results.
+- Trainer core: `trainer.zig` supports reference, drill, recognition quiz, hints, attempts, answers, and playback requests without renderer imports.
+- Progress core: `progress.zig` tracks attempts, timing, accuracy, learned status, weak cases, and due reviews in memory.
+- Desktop prototype: raylib can browse cases, show setup/solution algorithms, play setup/solution animations, reveal hints, and record drill progress.
 
-## Next Gate: Full 2-Look Core Trainer
+## Next Gate: Product Trainer Surface
 
-Finish a trusted renderer-free 2-look trainer foundation before investing in web or heavier desktop UI.
+Make the trainer usable and polished without moving product logic back into raylib.
 
-1. Complete full 2-look OLL/PLL data.
-   - Add all standard 2-look OLL and PLL cases.
-   - Keep Rubix-owned case data with J Perm attribution links.
-   - Ensure every setup fixture preserves stage semantics and solves with its solution.
+1. Polish the desktop trainer harness.
+   - Make mode/case navigation clearer.
+   - Add recognition quiz input beyond the current reference/drill prototype.
+   - Keep the UI useful, but avoid treating raylib as the final product surface.
 
-2. Replace exact fixture recognition.
-   - Recognize last-layer signatures instead of exact full-cube setup states.
-   - Handle AUF variants.
-   - Return known, solved, or unsupported results.
+2. Improve notation execution coverage.
+   - Add executable support for slice and wide moves.
+   - Keep existing face-turn and rotation tests green.
+   - This should happen before importing larger full OLL/PLL algorithm sets.
 
-3. Add the first trainer session model.
-   - Support reference, drill, and recognition quiz modes.
-   - Track selected case, prompt cube, hints, attempts, answer checks, and playback commands.
+3. Design the first web trainer screen.
+   - Build the real trainer screen first: cube, case selector, algorithm playback, timer, hints, quiz state, and progress.
+   - Use the existing core APIs instead of duplicating trainer logic in the frontend.
 
-4. Add basic progress.
-   - Track attempts, success, best/average time, recognition accuracy, learned status, weak-case ranking, and review selection.
-   - Keep persistence out of scope.
+4. Add persistence after the trainer loop feels right.
+   - Save progress locally first.
+   - Keep account/cloud sync out of scope until the local product is useful.
 
-5. Lightly wire the desktop prototype.
-   - Use raylib as a temporary harness for browsing cases, showing algorithms, playing animations, revealing hints, and recording in-memory progress.
+5. Prepare full CFOP expansion.
+   - Add full OLL/PLL after notation and trainer UX are stable.
+   - Add F2L and Cross teaching only after the last-layer trainer is genuinely useful.
 
 ## Next Product Steps
 
-## 1. Finish CFOP data correctness
+## 1. Productize the trainer experience
 
-After the review fixes, complete the 2-look OLL/PLL data slice with verified algorithms, semantic case fixtures, and attribution. Do not add more trainer behavior until the case data can be trusted.
+Use the current desktop harness to learn what feels awkward, then move the same flow into a web-first trainer surface.
 
-## 2. Improve recognition beyond exact fixtures
+## 2. Expand algorithm capability
 
-Replace exact full-cube matching with case signatures that can tolerate AUF/orientation variants where appropriate. Recognition should return supported case IDs or a clear unknown result.
+Add executable slice/wide notation support and stronger algorithm data tooling before importing larger case sets.
 
-## 3. Add the first trainer session model
+## 3. Add persistence and rewards
 
-Introduce a renderer-free `trainer.zig` model for selected stage, case, mode, prompt, hint state, attempt state, playback command, and progress update hooks before building more UI.
-
-## 4. Add basic progress
-
-Add `progress.zig` for attempts, success, best/average time, recognition accuracy, learned status, weak-case selection, and due-case review. Keep persistence out of scope for the first pass.
-
-## 5. Lightly wire the desktop prototype
-
-Use raylib as a temporary harness to browse starter cases, show setup/solution algorithms, play animations, reveal hints, and record in-memory progress. Keep the long-term product logic renderer-free.
+Persist local progress, then layer in rewards, streaks, and spaced-repetition tuning.

@@ -34,22 +34,27 @@ Completed:
 - Initial CFOP/algorithm model with source metadata and executable move validation.
 - Starter 2-look OLL/PLL case catalog and exact fixture recognizer.
 - CFOP core review fixes: standard rotation expansion tests, verified starter U-perms, semantic case fixture checks, empty-name algorithm validation, and fixture-recognition documentation.
+- Full 2-look OLL/PLL catalog with inverse setup fixtures and semantic tests.
+- AUF-aware 2-look recognition with known, solved, and unsupported results.
+- Renderer-free trainer session core for reference, drill, recognition quiz, hints, attempts, answers, and playback requests.
+- In-memory progress model for attempts, timing, accuracy, learned status, weak-case ranking, and due review.
+- Light desktop trainer prototype for browsing cases, showing algorithms, playing setup/solution animations, revealing hints, and recording drill progress.
 
 Partial or temporary:
 
 - Notation accepts slice/wide tokens but executable expansion for slice/wide moves is intentionally unsupported.
-- Recognition currently matches exact setup fixtures and is not yet real AUF/orientation-aware CFOP recognition.
-- Only a starter subset of 2-look OLL/PLL cases exists.
+- Desktop trainer UI is a prototype harness, not the final product surface.
+- Progress is in-memory only; persistence, accounts, rewards, and spaced-repetition tuning are still future work.
+- Recognition is 2-look last-layer only; Cross, F2L, full OLL, full PLL, and solve planning are still future work.
 
-### Current Gate: Full 2-Look Core Trainer
+### Current Gate: Product Trainer Surface
 
-Before building a serious frontend, finish the renderer-free 2-look trainer foundation:
+The renderer-free 2-look trainer foundation is in place. Next, make the trainer feel like a product:
 
-- Expand the case catalog to full 2-look OLL and 2-look PLL.
-- Replace exact setup-state matching with AUF-aware last-layer recognition.
-- Add renderer-free trainer session state for reference, drill, and recognition quiz flows.
-- Add in-memory progress tracking for attempts, accuracy, weak cases, and review selection.
-- Lightly wire the desktop app as a temporary prototype harness.
+- Polish the desktop trainer loop enough for manual practice while keeping it a temporary harness.
+- Design the first web trainer screen around the existing core APIs.
+- Add persistent progress only after the session/progress semantics feel right.
+- Improve notation support for slice and wide moves before importing larger algorithm sets.
 
 ### 1. Documentation and Architecture Pivot
 
@@ -73,7 +78,7 @@ Before building a serious frontend, finish the renderer-free 2-look trainer foun
 - Extend notation support for CFOP algorithm data, including rotations, slices, wide moves, comments, setup moves, and display-friendly formatting.
 - Add curated case data for 2-look OLL and 2-look PLL first.
 - Add fixtures proving setup algorithms create expected cases and solution algorithms resolve them.
-- Status: algorithm model, starter data, and review fixes are in place; full 2-look data is next.
+- Status: full 2-look data and semantic fixtures are in place.
 
 ### 4. 2-Look OLL/PLL MVP
 
@@ -94,6 +99,7 @@ Required learner flows:
 - Animate setup and solution.
 - Use the app with either a real cube or the virtual cube.
 - Record basic progress per case.
+- Status: renderer-free trainer/progress core and a light desktop harness are in place; product UI polish and persistence are next.
 
 ### 5. Full CFOP Curriculum
 
