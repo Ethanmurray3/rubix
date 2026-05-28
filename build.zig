@@ -87,6 +87,7 @@ pub fn build(b: *std.Build) void {
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/move_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/scramble_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/notation_test.zig"), b);
+    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/trainer_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/ui_test.zig"), b);
 }
 

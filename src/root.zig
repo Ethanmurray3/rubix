@@ -9,4 +9,5 @@ pub const move = @import("move.zig");
 pub const scramble = @import("scramble.zig");
 pub const animation = @import("animation.zig");
 pub const notation = @import("notation.zig");
+pub const trainer = @import("trainer.zig");
 pub const ui = @import("ui.zig");
