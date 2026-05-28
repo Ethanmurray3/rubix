@@ -1,4 +1,6 @@
+pub const algorithm = @import("algorithm.zig");
 pub const cli_core = @import("cli_core.zig");
+pub const cfop = @import("cfop.zig");
 pub const cube = @import("cube.zig");
 pub const facelet = @import("facelet.zig");
 pub const move = @import("move.zig");
