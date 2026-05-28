@@ -33,22 +33,23 @@ Completed:
 - CFOP notation token foundation for face turns, rotations, slices, and wide move display tokens.
 - Initial CFOP/algorithm model with source metadata and executable move validation.
 - Starter 2-look OLL/PLL case catalog and exact fixture recognizer.
+- CFOP core review fixes: standard rotation expansion tests, verified starter U-perms, semantic case fixture checks, empty-name algorithm validation, and fixture-recognition documentation.
 
 Partial or temporary:
 
 - Notation accepts slice/wide tokens but executable expansion for slice/wide moves is intentionally unsupported.
-- Starter PLL data and stage semantics need review fixes before more case data is added.
 - Recognition currently matches exact setup fixtures and is not yet real AUF/orientation-aware CFOP recognition.
+- Only a starter subset of 2-look OLL/PLL cases exists.
 
-### Current Review Fixes
+### Current Gate: Full 2-Look Core Trainer
 
-Before building the trainer session, resolve the review issues found in the first CFOP core pass:
+Before building a serious frontend, finish the renderer-free 2-look trainer foundation:
 
-- Fix standard `y`/`y'` rotation expansion and add direct rotation mapping tests.
-- Replace the starter PLL U-perm algorithms with verified PLL-only algorithms.
-- Strengthen CFOP fixture tests so they assert stage semantics, not only `setup + solution == solved`.
-- Add missing algorithm metadata validation for empty names and document borrowed static-data slices.
-- Treat exact full-cube case recognition as a temporary fixture matcher until AUF/orientation-aware signatures exist.
+- Expand the case catalog to full 2-look OLL and 2-look PLL.
+- Replace exact setup-state matching with AUF-aware last-layer recognition.
+- Add renderer-free trainer session state for reference, drill, and recognition quiz flows.
+- Add in-memory progress tracking for attempts, accuracy, weak cases, and review selection.
+- Lightly wire the desktop app as a temporary prototype harness.
 
 ### 1. Documentation and Architecture Pivot
 
@@ -72,7 +73,7 @@ Before building the trainer session, resolve the review issues found in the firs
 - Extend notation support for CFOP algorithm data, including rotations, slices, wide moves, comments, setup moves, and display-friendly formatting.
 - Add curated case data for 2-look OLL and 2-look PLL first.
 - Add fixtures proving setup algorithms create expected cases and solution algorithms resolve them.
-- Status: algorithm model and starter data are in place; review fixes and stronger semantic tests are required before this milestone is done enough.
+- Status: algorithm model, starter data, and review fixes are in place; full 2-look data is next.
 
 ### 4. 2-Look OLL/PLL MVP
 
