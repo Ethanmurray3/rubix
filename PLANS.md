@@ -23,12 +23,40 @@ Use J Perm as attributed inspiration and a reference for case organization. Do n
 
 ## Product Milestones
 
+### Current Status
+
+Completed:
+
+- Documentation and architecture pivot.
+- Initial portable core boundary: `rubix` is renderer-free and `rubix_desktop` owns raylib-facing modules.
+- Read-only cube inspection APIs for corner/edge state, solved slots, up-layer checks, and facelet color views.
+- CFOP notation token foundation for face turns, rotations, slices, and wide move display tokens.
+- Initial CFOP/algorithm model with source metadata and executable move validation.
+- Starter 2-look OLL/PLL case catalog and exact fixture recognizer.
+
+Partial or temporary:
+
+- Notation accepts slice/wide tokens but executable expansion for slice/wide moves is intentionally unsupported.
+- Starter PLL data and stage semantics need review fixes before more case data is added.
+- Recognition currently matches exact setup fixtures and is not yet real AUF/orientation-aware CFOP recognition.
+
+### Current Review Fixes
+
+Before building the trainer session, resolve the review issues found in the first CFOP core pass:
+
+- Fix standard `y`/`y'` rotation expansion and add direct rotation mapping tests.
+- Replace the starter PLL U-perm algorithms with verified PLL-only algorithms.
+- Strengthen CFOP fixture tests so they assert stage semantics, not only `setup + solution == solved`.
+- Add missing algorithm metadata validation for empty names and document borrowed static-data slices.
+- Treat exact full-cube case recognition as a temporary fixture matcher until AUF/orientation-aware signatures exist.
+
 ### 1. Documentation and Architecture Pivot
 
 - Reframe the repo as a shipped CFOP trainer product, not a Zig learning project.
 - Keep the current desktop visualizer working while future work moves toward a portable trainer core and web-first UI.
 - Document that trainer/session/progress/CFOP logic must stay independent from raylib.
 - Make product polish, maintainability, portability, and learner outcomes the default decision criteria.
+- Status: done.
 
 ### 2. Portable Core Boundary
 
@@ -36,6 +64,7 @@ Use J Perm as attributed inspiration and a reference for case organization. Do n
 - Keep cube state, moves, notation, facelet projection, scramble, algorithm data, CFOP recognition, trainer sessions, progress, and solver planning independent from raylib.
 - Isolate raylib into desktop app, rendering, window, and input adapter modules.
 - Move reusable orientation/control/session concepts into renderer-free modules before building web or iOS frontends.
+- Status: initial split done; future orientation/control/session extraction can continue as trainer needs it.
 
 ### 3. Algorithm and Case Foundation
 
@@ -43,6 +72,7 @@ Use J Perm as attributed inspiration and a reference for case organization. Do n
 - Extend notation support for CFOP algorithm data, including rotations, slices, wide moves, comments, setup moves, and display-friendly formatting.
 - Add curated case data for 2-look OLL and 2-look PLL first.
 - Add fixtures proving setup algorithms create expected cases and solution algorithms resolve them.
+- Status: algorithm model and starter data are in place; review fixes and stronger semantic tests are required before this milestone is done enough.
 
 ### 4. 2-Look OLL/PLL MVP
 

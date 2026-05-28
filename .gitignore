@@ -6,6 +6,7 @@ zig-pkg/
 
 # Local editor and OS files
 .DS_Store
+nvim.log
 *.swp
 *.swo
 
