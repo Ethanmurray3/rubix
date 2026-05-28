@@ -135,6 +135,17 @@ test "facelet projection pins known move cases" {
     }
 }
 
+test "facelet colors returns case-friendly sticker view" {
+    var cube = cube_mod.Cube.solved();
+    cube.applyMove(.R);
+
+    const up = facelet.faceColors(cube, .up);
+    try std.testing.expectEqual(facelet.Color.white, up[0]);
+    try std.testing.expectEqual(facelet.Color.green, up[2]);
+    try std.testing.expectEqual(facelet.Color.white, up[4]);
+    try std.testing.expectEqual(facelet.Color.green, up[8]);
+}
+
 test "facelet projection pins known algorithm cases" {
     const sexy = [_]move_mod.Move{ .R, .U, .RPrime, .UPrime };
     var cube = cube_mod.Cube.solved();

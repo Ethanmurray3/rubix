@@ -137,6 +137,14 @@ pub fn color(cube: cube_mod.Cube, face: Face, index: usize) Color {
     };
 }
 
+pub fn faceColors(cube: cube_mod.Cube, face: Face) [9]Color {
+    var result: [9]Color = undefined;
+    for (&result, 0..) |*sticker, index| {
+        sticker.* = color(cube, face, index);
+    }
+    return result;
+}
+
 pub fn moveFace(move: move_mod.Move) Face {
     return switch (move) {
         .U, .UPrime, .U2 => .up,

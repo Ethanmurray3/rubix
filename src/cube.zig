@@ -26,6 +26,54 @@ pub const Edge = enum(u4) {
     dl,
 };
 
+pub const CornerPosition = enum(u3) {
+    ufr,
+    urb,
+    ubl,
+    ulf,
+    dfr,
+    drb,
+    dbl,
+    dlf,
+};
+
+pub const EdgePosition = enum(u4) {
+    uf,
+    ur,
+    ub,
+    ul,
+    fr,
+    br,
+    bl,
+    fl,
+    df,
+    dr,
+    db,
+    dl,
+};
+
+pub const CornerState = struct {
+    piece: Corner,
+    orientation: u2,
+
+    pub fn isOriented(self: CornerState) bool {
+        return self.orientation == 0;
+    }
+};
+
+pub const EdgeState = struct {
+    piece: Edge,
+    orientation: u1,
+
+    pub fn isOriented(self: EdgeState) bool {
+        return self.orientation == 0;
+    }
+
+    pub fn isFlipped(self: EdgeState) bool {
+        return self.orientation != 0;
+    }
+};
+
 pub const CubeBits = u100;
 
 pub const ValidationError = error{
@@ -67,6 +115,9 @@ const Position = enum(u5) {
     dl = 19,
 };
 
+const up_corner_positions = [_]CornerPosition{ .ufr, .urb, .ubl, .ulf };
+const up_edge_positions = [_]EdgePosition{ .uf, .ur, .ub, .ul };
+
 const solved_bits: CubeBits = Cube.solved().bits;
 
 pub const Cube = struct {
@@ -102,6 +153,76 @@ pub const Cube = struct {
 
     pub fn isSolved(self: Cube) bool {
         return self.bits == solved_bits;
+    }
+
+    pub fn cornerAt(self: Cube, position: CornerPosition) CornerState {
+        return self.checkedCornerAt(position) catch unreachable;
+    }
+
+    pub fn checkedCornerAt(self: Cube, position: CornerPosition) ValidationError!CornerState {
+        const chunk = getChunk(self.bits, cornerPosition(position));
+        const orientation = cornerOrientation(chunk);
+        if (orientation >= 3) return ValidationError.InvalidCornerOrientation;
+
+        return .{
+            .piece = cornerFromChunk(chunk),
+            .orientation = orientation,
+        };
+    }
+
+    pub fn edgeAt(self: Cube, position: EdgePosition) EdgeState {
+        return self.checkedEdgeAt(position) catch unreachable;
+    }
+
+    pub fn checkedEdgeAt(self: Cube, position: EdgePosition) ValidationError!EdgeState {
+        const chunk = getChunk(self.bits, edgePosition(position));
+        const piece: u4 = @truncate(chunk & 0b01111);
+        if (piece >= 12) return ValidationError.InvalidEdgePiece;
+
+        return .{
+            .piece = @enumFromInt(piece),
+            .orientation = edgeOrientation(chunk),
+        };
+    }
+
+    pub fn isCornerSolved(self: Cube, position: CornerPosition) bool {
+        const state = self.cornerAt(position);
+        return state.piece == cornerPieceForPosition(position) and state.isOriented();
+    }
+
+    pub fn isEdgeSolved(self: Cube, position: EdgePosition) bool {
+        const state = self.edgeAt(position);
+        return state.piece == edgePieceForPosition(position) and state.isOriented();
+    }
+
+    pub fn isUpLayerOriented(self: Cube) bool {
+        inline for (up_corner_positions) |position| {
+            if (!self.cornerAt(position).isOriented()) return false;
+        }
+        inline for (up_edge_positions) |position| {
+            if (!self.edgeAt(position).isOriented()) return false;
+        }
+        return true;
+    }
+
+    pub fn isUpLayerPermutationSolved(self: Cube) bool {
+        inline for (up_corner_positions) |position| {
+            if (self.cornerAt(position).piece != cornerPieceForPosition(position)) return false;
+        }
+        inline for (up_edge_positions) |position| {
+            if (self.edgeAt(position).piece != edgePieceForPosition(position)) return false;
+        }
+        return true;
+    }
+
+    pub fn isUpLayerSolved(self: Cube) bool {
+        inline for (up_corner_positions) |position| {
+            if (!self.isCornerSolved(position)) return false;
+        }
+        inline for (up_edge_positions) |position| {
+            if (!self.isEdgeSolved(position)) return false;
+        }
+        return true;
     }
 
     pub fn validate(self: Cube) ValidationError!void {
@@ -425,6 +546,44 @@ pub const Cube = struct {
 fn getChunk(bits: CubeBits, position: Position) u5 {
     const shift: u7 = @as(u7, @intFromEnum(position)) * chunk_size;
     return @truncate((bits >> shift) & chunk_mask);
+}
+
+fn cornerPosition(position: CornerPosition) Position {
+    return switch (position) {
+        .ufr => .ufr,
+        .urb => .urb,
+        .ubl => .ubl,
+        .ulf => .ulf,
+        .dfr => .dfr,
+        .drb => .drb,
+        .dbl => .dbl,
+        .dlf => .dlf,
+    };
+}
+
+fn edgePosition(position: EdgePosition) Position {
+    return switch (position) {
+        .uf => .uf,
+        .ur => .ur,
+        .ub => .ub,
+        .ul => .ul,
+        .fr => .fr,
+        .br => .br,
+        .bl => .bl,
+        .fl => .fl,
+        .df => .df,
+        .dr => .dr,
+        .db => .db,
+        .dl => .dl,
+    };
+}
+
+fn cornerPieceForPosition(position: CornerPosition) Corner {
+    return @enumFromInt(@intFromEnum(position));
+}
+
+fn edgePieceForPosition(position: EdgePosition) Edge {
+    return @enumFromInt(@intFromEnum(position));
 }
 
 fn setChunk(bits: CubeBits, position: Position, chunk: u5) CubeBits {

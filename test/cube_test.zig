@@ -74,6 +74,44 @@ test "solved cube reports solved" {
     try expectSolved(Cube.solved());
 }
 
+test "inspection APIs expose solved cubie state" {
+    const cube = Cube.solved();
+
+    try std.testing.expectEqual(cube_mod.Corner.ufr, cube.cornerAt(.ufr).piece);
+    try std.testing.expectEqual(@as(u2, 0), cube.cornerAt(.ufr).orientation);
+    try std.testing.expect(cube.cornerAt(.ufr).isOriented());
+    try std.testing.expect(cube.isCornerSolved(.ufr));
+
+    try std.testing.expectEqual(cube_mod.Edge.uf, cube.edgeAt(.uf).piece);
+    try std.testing.expectEqual(@as(u1, 0), cube.edgeAt(.uf).orientation);
+    try std.testing.expect(cube.edgeAt(.uf).isOriented());
+    try std.testing.expect(!cube.edgeAt(.uf).isFlipped());
+    try std.testing.expect(cube.isEdgeSolved(.uf));
+
+    try std.testing.expect(cube.isUpLayerOriented());
+    try std.testing.expect(cube.isUpLayerPermutationSolved());
+    try std.testing.expect(cube.isUpLayerSolved());
+}
+
+test "inspection APIs expose moved cubie state without reading bits" {
+    var cube = Cube.solved();
+    cube.applyMove(.R);
+
+    const ufr = cube.cornerAt(.ufr);
+    try std.testing.expectEqual(cube_mod.Corner.dfr, ufr.piece);
+    try std.testing.expectEqual(@as(u2, 2), ufr.orientation);
+    try std.testing.expect(!cube.isCornerSolved(.ufr));
+
+    const ur = cube.edgeAt(.ur);
+    try std.testing.expectEqual(cube_mod.Edge.fr, ur.piece);
+    try std.testing.expect(ur.isOriented());
+    try std.testing.expect(!cube.isEdgeSolved(.ur));
+
+    try std.testing.expect(!cube.isUpLayerOriented());
+    try std.testing.expect(!cube.isUpLayerPermutationSolved());
+    try std.testing.expect(!cube.isUpLayerSolved());
+}
+
 test "one face turn does not report solved" {
     try expectOneTurnUnsolved(Cube.turnU);
     try expectOneTurnUnsolved(Cube.turnD);
@@ -166,6 +204,31 @@ test "scramble followed by inverse sequence returns solved" {
     try expectSolved(cube);
 }
 
+test "inspection APIs are useful on scrambled cubes" {
+    var prng = std.Random.DefaultPrng.init(12345);
+    const scramble = scramble_mod.generate(prng.random());
+
+    var cube = Cube.solved();
+    cube.applyMoves(&scramble.moves);
+    try cube.validate();
+
+    var solved_slot_count: usize = 0;
+    inline for (std.meta.fields(cube_mod.CornerPosition)) |field| {
+        const position: cube_mod.CornerPosition = @enumFromInt(field.value);
+        const state = cube.cornerAt(position);
+        _ = state.isOriented();
+        if (cube.isCornerSolved(position)) solved_slot_count += 1;
+    }
+    inline for (std.meta.fields(cube_mod.EdgePosition)) |field| {
+        const position: cube_mod.EdgePosition = @enumFromInt(field.value);
+        const state = cube.edgeAt(position);
+        _ = state.isFlipped();
+        if (cube.isEdgeSolved(position)) solved_slot_count += 1;
+    }
+
+    try std.testing.expect(solved_slot_count < 20);
+}
+
 test "validation accepts solved cube moves and scrambles" {
     try Cube.solved().validate();
 
@@ -204,6 +267,18 @@ test "validation rejects malformed cube bits" {
     var duplicate_edge = solved;
     duplicate_edge.bits = setRawChunk(duplicate_edge.bits, 9, 0b00000);
     try std.testing.expectError(error.DuplicateEdge, duplicate_edge.validate());
+}
+
+test "checked inspection rejects malformed raw states" {
+    const solved = Cube.solved();
+
+    var invalid_corner_orientation = solved;
+    invalid_corner_orientation.bits = setRawChunk(invalid_corner_orientation.bits, 0, 0b11000);
+    try std.testing.expectError(error.InvalidCornerOrientation, invalid_corner_orientation.checkedCornerAt(.ufr));
+
+    var invalid_edge_piece = solved;
+    invalid_edge_piece.bits = setRawChunk(invalid_edge_piece.bits, 8, 0b01100);
+    try std.testing.expectError(error.InvalidEdgePiece, invalid_edge_piece.checkedEdgeAt(.uf));
 }
 
 test "validation rejects mismatched corner and edge permutation parity" {
