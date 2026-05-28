@@ -76,6 +76,7 @@ pub fn build(b: *std.Build) void {
     addRunTest(test_step, b.addTest(.{ .root_module = exe.root_module }), b);
     addRunTest(test_step, b.addTest(.{ .root_module = cli_exe.root_module }), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/algorithm_test.zig"), b);
+    addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cfop_cases_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cube_test.zig"), b);
     addRunTest(test_step, addTestFile(b, mod, target, optimize, "test/cli_test.zig"), b);
     addRunTest(test_step, addDesktopTestFile(b, mod, desktop_mod, target, optimize, "test/camera_test.zig"), b);
