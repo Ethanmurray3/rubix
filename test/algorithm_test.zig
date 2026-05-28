@@ -74,6 +74,18 @@ test "algorithm definition catches metadata and notation mistakes" {
     );
 
     try std.testing.expectError(
+        error.EmptyName,
+        (algorithm.Definition{
+            .id = "nameless",
+            .case = valid_case,
+            .name = "",
+            .display = "R",
+            .source = source,
+            .moves = &.{.R},
+        }).validate(std.testing.allocator),
+    );
+
+    try std.testing.expectError(
         error.UnsupportedExecutableToken,
         (algorithm.Definition{
             .id = "unsupported",

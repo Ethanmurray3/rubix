@@ -7,6 +7,7 @@ const notation = @import("notation.zig");
 pub const ValidationError = error{
     EmptyId,
     EmptyCaseId,
+    EmptyName,
     EmptyDisplay,
     EmptySourceName,
     EmptySourceUrl,
@@ -26,9 +27,12 @@ pub const Definition = struct {
     source: Source,
     moves: []const move_mod.Move,
 
+    // Slices are borrowed. Current CFOP data is static; callers loading
+    // external data must keep backing storage alive for the definition.
     pub fn validate(self: Definition, allocator: std.mem.Allocator) !void {
         if (self.id.len == 0) return ValidationError.EmptyId;
         if (self.case.id.len == 0) return ValidationError.EmptyCaseId;
+        if (self.name.len == 0) return ValidationError.EmptyName;
         if (self.display.len == 0) return ValidationError.EmptyDisplay;
         if (self.source.name.len == 0) return ValidationError.EmptySourceName;
         if (self.source.url.len == 0) return ValidationError.EmptySourceUrl;

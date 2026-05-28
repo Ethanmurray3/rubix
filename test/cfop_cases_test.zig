@@ -5,6 +5,24 @@ const cfop = rubix.cfop;
 const cases = rubix.cfop_cases;
 const cube_mod = rubix.cube;
 
+fn expectF2LSolved(cube: cube_mod.Cube) !void {
+    inline for (.{ cube_mod.CornerPosition.dfr, .drb, .dbl, .dlf }) |position| {
+        try std.testing.expect(cube.isCornerSolved(position));
+    }
+    inline for (.{
+        cube_mod.EdgePosition.fr,
+        .br,
+        .bl,
+        .fl,
+        .df,
+        .dr,
+        .db,
+        .dl,
+    }) |position| {
+        try std.testing.expect(cube.isEdgeSolved(position));
+    }
+}
+
 test "starter two-look cases validate algorithm metadata" {
     try std.testing.expect(cases.two_look_cases.len >= 4);
 
@@ -30,5 +48,25 @@ test "starter two-look setup and solution fixtures resolve" {
         case.solution.apply(&cube);
         try cube.validate();
         try std.testing.expect(cube.isSolved());
+    }
+}
+
+test "starter two-look setup fixtures preserve stage semantics" {
+    for (cases.two_look_cases) |case| {
+        var cube = cube_mod.Cube.solved();
+        case.setup.apply(&cube);
+        try cube.validate();
+        try expectF2LSolved(cube);
+
+        switch (case.stage) {
+            .oll => {
+                try std.testing.expect(!cube.isUpLayerOriented());
+            },
+            .pll => {
+                try std.testing.expect(cube.isUpLayerOriented());
+                try std.testing.expect(!cube.isUpLayerPermutationSolved());
+            },
+            else => unreachable,
+        }
     }
 }

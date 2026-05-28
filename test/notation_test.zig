@@ -124,11 +124,34 @@ test "expandTokensInto applies cube rotations to later face turns" {
     try std.testing.expectEqualSlices(move_mod.Move, &.{ .F, .R, .D, .UPrime }, moves);
 }
 
+test "expandTokensInto maps standalone rotations using standard face frames" {
+    const cases = .{
+        .{ "x U", move_mod.Move.F },
+        .{ "x' U", move_mod.Move.B },
+        .{ "x F", move_mod.Move.D },
+        .{ "x' F", move_mod.Move.U },
+        .{ "y F", move_mod.Move.R },
+        .{ "y' F", move_mod.Move.L },
+        .{ "y R", move_mod.Move.B },
+        .{ "y' R", move_mod.Move.F },
+        .{ "z U", move_mod.Move.L },
+        .{ "z' U", move_mod.Move.R },
+        .{ "z R", move_mod.Move.U },
+        .{ "z' R", move_mod.Move.D },
+    };
+
+    inline for (cases) |case| {
+        const moves = try notation.parseExecutableAlgorithm(std.testing.allocator, case[0]);
+        defer std.testing.allocator.free(moves);
+        try std.testing.expectEqualSlices(move_mod.Move, &.{case[1]}, moves);
+    }
+}
+
 test "parseExecutableAlgorithm expands rotations and keeps allocation freeable" {
     const moves = try notation.parseExecutableAlgorithm(std.testing.allocator, "x U y R z F'");
     defer std.testing.allocator.free(moves);
 
-    try std.testing.expectEqualSlices(move_mod.Move, &.{ .F, .D, .LPrime }, moves);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .F, .U, .RPrime }, moves);
 }
 
 test "expandTokensInto rejects slice and wide moves until executable support exists" {

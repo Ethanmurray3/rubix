@@ -338,10 +338,10 @@ const FaceFrame = struct {
                 self.back = old.up;
             },
             .y => {
-                self.front = old.left;
-                self.right = old.front;
-                self.back = old.right;
-                self.left = old.back;
+                self.front = old.right;
+                self.right = old.back;
+                self.back = old.left;
+                self.left = old.front;
             },
             .z => {
                 self.up = old.left;
