@@ -22,6 +22,37 @@ test "parseMove rejects empty invalid face and invalid suffix tokens" {
     try std.testing.expectError(error.InvalidSuffix, notation.parseMove("R''"));
 }
 
+test "parseToken accepts CFOP display tokens" {
+    try std.testing.expectEqual(notation.Token{ .base = .x }, try notation.parseToken("x"));
+    try std.testing.expectEqual(notation.Token{ .base = .y, .amount = .prime }, try notation.parseToken("y'"));
+    try std.testing.expectEqual(notation.Token{ .base = .z, .amount = .double }, try notation.parseToken("z2"));
+    try std.testing.expectEqual(notation.Token{ .base = .M }, try notation.parseToken("M"));
+    try std.testing.expectEqual(notation.Token{ .base = .E, .amount = .prime }, try notation.parseToken("E'"));
+    try std.testing.expectEqual(notation.Token{ .base = .S, .amount = .double }, try notation.parseToken("S2"));
+    try std.testing.expectEqual(notation.Token{ .base = .r }, try notation.parseToken("r"));
+    try std.testing.expectEqual(notation.Token{ .base = .u, .amount = .prime }, try notation.parseToken("u'"));
+}
+
+test "parseTokens preserves CFOP token kinds" {
+    const tokens = try notation.parseTokens(std.testing.allocator, "x R U r' M2");
+    defer std.testing.allocator.free(tokens);
+
+    try std.testing.expectEqualSlices(
+        notation.Token,
+        &.{
+            .{ .base = .x },
+            .{ .base = .R },
+            .{ .base = .U },
+            .{ .base = .r, .amount = .prime },
+            .{ .base = .M, .amount = .double },
+        },
+        tokens,
+    );
+    try std.testing.expect(tokens[0].isRotation());
+    try std.testing.expect(tokens[1].isFaceTurn());
+    try std.testing.expect(tokens[3].isSliceOrWide());
+}
+
 test "parseMove round trips move names" {
     inline for (std.meta.fields(move_mod.Move)) |field| {
         const move: move_mod.Move = @enumFromInt(field.value);
@@ -76,6 +107,41 @@ test "parseAlgorithmInto rejects empty input and undersized output" {
 
     try std.testing.expectError(error.EmptyAlgorithm, notation.parseAlgorithmInto(" \t\n", &buffer));
     try std.testing.expectError(error.OutputTooSmall, notation.parseAlgorithmInto("R U R'", &buffer));
+}
+
+test "expandTokensInto applies cube rotations to later face turns" {
+    const tokens = [_]notation.Token{
+        .{ .base = .x },
+        .{ .base = .U },
+        .{ .base = .R },
+        .{ .base = .F },
+        .{ .base = .x, .amount = .prime },
+        .{ .base = .U, .amount = .prime },
+    };
+    var buffer: [tokens.len]move_mod.Move = undefined;
+
+    const moves = try notation.expandTokensInto(&tokens, &buffer);
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .F, .R, .D, .UPrime }, moves);
+}
+
+test "parseExecutableAlgorithm expands rotations and keeps allocation freeable" {
+    const moves = try notation.parseExecutableAlgorithm(std.testing.allocator, "x U y R z F'");
+    defer std.testing.allocator.free(moves);
+
+    try std.testing.expectEqualSlices(move_mod.Move, &.{ .F, .D, .LPrime }, moves);
+}
+
+test "expandTokensInto rejects slice and wide moves until executable support exists" {
+    var buffer: [2]move_mod.Move = undefined;
+
+    try std.testing.expectError(
+        error.UnsupportedExecutableToken,
+        notation.expandTokensInto(&.{.{ .base = .M }}, &buffer),
+    );
+    try std.testing.expectError(
+        error.UnsupportedExecutableToken,
+        notation.expandTokensInto(&.{.{ .base = .r, .amount = .prime }}, &buffer),
+    );
 }
 
 test "inverseAlgorithmInto reverses order and inverts each move" {
