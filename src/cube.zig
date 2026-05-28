@@ -155,6 +155,10 @@ pub const Cube = struct {
         return self.bits == solved_bits;
     }
 
+    pub fn eql(self: Cube, other: Cube) bool {
+        return self.bits == other.bits;
+    }
+
     pub fn cornerAt(self: Cube, position: CornerPosition) CornerState {
         return self.checkedCornerAt(position) catch unreachable;
     }
