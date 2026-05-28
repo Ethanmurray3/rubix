@@ -4,6 +4,8 @@ const rubix = @import("rubix");
 const cfop = rubix.cfop;
 const cases = rubix.cfop_cases;
 const cube_mod = rubix.cube;
+const move_mod = rubix.move;
+const notation = rubix.notation;
 
 fn expectF2LSolved(cube: cube_mod.Cube) !void {
     inline for (.{ cube_mod.CornerPosition.dfr, .drb, .dbl, .dlf }) |position| {
@@ -23,9 +25,28 @@ fn expectF2LSolved(cube: cube_mod.Cube) !void {
     }
 }
 
-test "starter two-look cases validate algorithm metadata" {
-    try std.testing.expect(cases.two_look_cases.len >= 4);
+test "two-look catalog includes the full starter OLL and PLL sets" {
+    try std.testing.expectEqual(@as(usize, 16), cases.two_look_cases.len);
 
+    var oll_count: usize = 0;
+    var pll_count: usize = 0;
+    for (cases.two_look_cases, 0..) |case, index| {
+        switch (case.stage) {
+            .oll => oll_count += 1,
+            .pll => pll_count += 1,
+            else => return error.UnexpectedStage,
+        }
+
+        for (cases.two_look_cases[index + 1 ..]) |other| {
+            try std.testing.expect(!std.mem.eql(u8, case.id, other.id));
+        }
+    }
+
+    try std.testing.expectEqual(@as(usize, 10), oll_count);
+    try std.testing.expectEqual(@as(usize, 6), pll_count);
+}
+
+test "two-look cases validate algorithm metadata" {
     for (cases.two_look_cases) |case| {
         try std.testing.expect(case.stage == .oll or case.stage == .pll);
         try std.testing.expectEqual(cfop.Look.two_look, case.look);
@@ -38,8 +59,12 @@ test "starter two-look cases validate algorithm metadata" {
     }
 }
 
-test "starter two-look setup and solution fixtures resolve" {
+test "two-look setups are inverse fixtures and resolve" {
     for (cases.two_look_cases) |case| {
+        var expected_setup: [32]move_mod.Move = undefined;
+        const inverse = try notation.inverseAlgorithmInto(case.solution.moves, &expected_setup);
+        try std.testing.expectEqualSlices(move_mod.Move, inverse, case.setup.moves);
+
         var cube = cube_mod.Cube.solved();
         case.setup.apply(&cube);
         try cube.validate();
@@ -51,7 +76,7 @@ test "starter two-look setup and solution fixtures resolve" {
     }
 }
 
-test "starter two-look setup fixtures preserve stage semantics" {
+test "two-look setup fixtures preserve stage semantics" {
     for (cases.two_look_cases) |case| {
         var cube = cube_mod.Cube.solved();
         case.setup.apply(&cube);
