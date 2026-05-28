@@ -9,6 +9,15 @@ const ui = rubix.ui;
 
 pub const target_fps = 240;
 
+pub const TrainerOverlay = struct {
+    case_line: [:0]const u8,
+    mode_line: [:0]const u8,
+    setup_line: [:0]const u8,
+    solution_line: [:0]const u8,
+    progress_line: [:0]const u8,
+    hint_visible: bool,
+};
+
 pub fn initWindow() void {
     rl.setConfigFlags(.{
         .window_resizable = true,
@@ -25,6 +34,7 @@ pub fn drawFrame(
     orientation: render.Orientation,
     last: ui.LastAction,
     view_controls: controls.ViewControls,
+    trainer_overlay: TrainerOverlay,
     visual_turn: ?animation.VisualTurn,
 ) void {
     rl.beginDrawing();
@@ -37,6 +47,7 @@ pub fn drawFrame(
     camera.end();
 
     drawOverlay(last, view_controls);
+    drawTrainerOverlay(trainer_overlay);
 }
 
 fn drawOverlay(last: ui.LastAction, view_controls: controls.ViewControls) void {
@@ -72,4 +83,27 @@ fn drawOverlay(last: ui.LastAction, view_controls: controls.ViewControls) void {
     const status_width = rl.measureText(last.status, 24);
     const x = @max(32, rl.getScreenWidth() - status_width - 32);
     rl.drawText(last.status, x, 28, 24, text_color);
+}
+
+fn drawTrainerOverlay(overlay: TrainerOverlay) void {
+    const text_color = rl.Color.init(42, 48, 58, 255);
+    const muted_color = rl.Color.init(80, 91, 107, 255);
+    const panel_color = rl.Color.init(255, 255, 255, 225);
+    const panel_width: i32 = 520;
+    const panel_height: i32 = 198;
+    const x: i32 = 16;
+    const y = rl.getScreenHeight() - panel_height - 16;
+
+    rl.drawRectangle(x, y, panel_width, panel_height, panel_color);
+    rl.drawRectangleLines(x, y, panel_width, panel_height, rl.Color.init(135, 169, 190, 255));
+    rl.drawText(overlay.case_line, x + 16, y + 14, 22, text_color);
+    rl.drawText(overlay.mode_line, x + 16, y + 44, 16, muted_color);
+    rl.drawText(overlay.setup_line, x + 16, y + 74, 15, text_color);
+    rl.drawText(overlay.solution_line, x + 16, y + 100, 15, text_color);
+    rl.drawText(overlay.progress_line, x + 16, y + 128, 15, muted_color);
+    rl.drawText("N/P: case    1/2/3: mode    Backspace: setup    Enter: solution    H: hint    T: drill", x + 16, y + 154, 14, muted_color);
+
+    if (overlay.hint_visible) {
+        rl.drawText("Hint: match the case shape first, then execute the shown solution.", x + 16, y + 176, 14, text_color);
+    }
 }

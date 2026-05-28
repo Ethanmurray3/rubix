@@ -119,6 +119,12 @@ pub const Session = struct {
         return self.finishAttempt(.incorrect);
     }
 
+    pub fn completeAttempt(self: *Session, correct: bool) Error!AnswerResult {
+        if (self.mode == .reference) return Error.WrongMode;
+        try self.requireRunningAttempt();
+        return self.finishAttempt(if (correct) .correct else .incorrect);
+    }
+
     pub fn playSetup(self: *Session) PlaybackRequest {
         self.last_playback = .{
             .kind = .setup,

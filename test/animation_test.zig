@@ -184,3 +184,27 @@ test "scramble animator clear stops playback without committing extra moves" {
     try std.testing.expectEqual(@as(?Move, null), animator.update(0.1, &cube));
     try std.testing.expectEqual(solved_bits, cube.bits);
 }
+
+test "algorithm animator applies arbitrary move slices in order" {
+    var cube = Cube.solved();
+    var animator = animation.AlgorithmAnimator{ .turn_duration = 0.1 };
+
+    try animator.start(&.{ .R, .U, .RPrime, .UPrime });
+
+    while (animator.isRunning()) {
+        _ = animator.update(0.1, &cube);
+    }
+
+    var expected = Cube.solved();
+    expected.applyMoves(&.{ .R, .U, .RPrime, .UPrime });
+    try std.testing.expect(cube.eql(expected));
+    try std.testing.expect(animator.isIdle());
+}
+
+test "algorithm animator rejects move slices longer than its fixed buffer" {
+    var animator = animation.AlgorithmAnimator{};
+    var moves: [animation.max_algorithm_moves + 1]Move = undefined;
+    @memset(&moves, .U);
+
+    try std.testing.expectError(error.TooManyMoves, animator.start(&moves));
+}

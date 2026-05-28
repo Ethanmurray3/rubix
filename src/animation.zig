@@ -11,6 +11,11 @@ const Scramble = scramble_mod.Scramble;
 
 pub const default_user_turn_duration: f32 = 0.16;
 pub const default_scramble_turn_duration: f32 = 0.115;
+pub const max_algorithm_moves = 32;
+
+pub const AnimationError = error{
+    TooManyMoves,
+};
 
 pub const VisualTurn = struct {
     face: Face,
@@ -150,6 +155,76 @@ pub const ScrambleAnimator = struct {
 
         self.active = .{
             .move = scramble.moves[self.index],
+            .elapsed = 0,
+            .duration = self.turn_duration,
+        };
+        self.index += 1;
+    }
+};
+
+pub const AlgorithmAnimator = struct {
+    moves: [max_algorithm_moves]Move = undefined,
+    len: usize = 0,
+    index: usize = 0,
+    active: ?ActiveTurn = null,
+    turn_duration: f32 = default_scramble_turn_duration,
+
+    pub fn start(self: *AlgorithmAnimator, moves: []const Move) AnimationError!void {
+        if (moves.len > self.moves.len) return AnimationError.TooManyMoves;
+
+        @memcpy(self.moves[0..moves.len], moves);
+        self.len = moves.len;
+        self.index = 0;
+        self.active = null;
+    }
+
+    pub fn update(self: *AlgorithmAnimator, dt: f32, cube: *Cube) ?Move {
+        self.startNextIfIdle();
+        if (self.active == null) return null;
+
+        self.active.?.elapsed += @max(0, dt);
+        if (self.active.?.elapsed < self.active.?.duration) return null;
+
+        const move = self.active.?.move;
+        cube.applyMove(move);
+        self.active = null;
+        if (self.index == self.len) self.len = 0;
+        return move;
+    }
+
+    pub fn visualTurn(self: AlgorithmAnimator) ?VisualTurn {
+        const active = self.active orelse return null;
+        return visualTurnForProgress(active.move, active.progress());
+    }
+
+    pub fn activeMove(self: AlgorithmAnimator) ?Move {
+        if (self.active) |active| return active.move;
+        return null;
+    }
+
+    pub fn isIdle(self: AlgorithmAnimator) bool {
+        return self.len == 0 and self.active == null;
+    }
+
+    pub fn isRunning(self: AlgorithmAnimator) bool {
+        return !self.isIdle();
+    }
+
+    pub fn clear(self: *AlgorithmAnimator) void {
+        self.len = 0;
+        self.index = 0;
+        self.active = null;
+    }
+
+    fn startNextIfIdle(self: *AlgorithmAnimator) void {
+        if (self.active != null) return;
+        if (self.index >= self.len) {
+            self.len = 0;
+            return;
+        }
+
+        self.active = .{
+            .move = self.moves[self.index],
             .elapsed = 0,
             .duration = self.turn_duration,
         };
