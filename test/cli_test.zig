@@ -2,7 +2,7 @@ const std = @import("std");
 const rubix = @import("rubix");
 
 const cli = rubix.cli_core;
-const move_mod = rubix.move;
+const facelet = rubix.facelet;
 
 fn expectRun(args: []const []const u8, expected_code: cli.ExitCode, expected_stdout: []const u8, expected_stderr: []const u8) !void {
     const result = try cli.runAlloc(std.testing.allocator, args, 12345);
@@ -26,7 +26,7 @@ test "invert normalizes inverse notation" {
     try expectRun(&.{ "invert", "  R U   R' U' " }, .success, "U R U' R'\n", "");
 }
 
-test "scramble seeded output is deterministic and avoids adjacent axes" {
+test "scramble seeded output is deterministic and avoids adjacent same-face moves" {
     const first = try cli.runAlloc(std.testing.allocator, &.{ "scramble", "--seed", "123" }, 0);
     defer first.deinit(std.testing.allocator);
     const second = try cli.runAlloc(std.testing.allocator, &.{ "scramble", "--seed", "123" }, 999);
@@ -39,7 +39,7 @@ test "scramble seeded output is deterministic and avoids adjacent axes" {
     const moves = try rubix.notation.parseAlgorithm(std.testing.allocator, std.mem.trimEnd(u8, first.stdout, "\n"));
     defer std.testing.allocator.free(moves);
     for (moves[1..], 1..) |move, index| {
-        try std.testing.expect(move_mod.moveAxis(move) != move_mod.moveAxis(moves[index - 1]));
+        try std.testing.expect(facelet.moveFace(move) != facelet.moveFace(moves[index - 1]));
     }
 }
 
